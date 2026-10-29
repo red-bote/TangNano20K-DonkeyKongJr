@@ -17,6 +17,7 @@
 
 module dkongjr_col_pal
 (
+	input  CLK_24M,
 	input  CLK_6M,
 	input  CLK_12M,
 	input  [5:0]I_VRAM_D,
@@ -41,12 +42,10 @@ wire   [5:0]W_3ML_Y = (~(I_OBJ_D[0]|I_OBJ_D[1])) ? I_VRAM_D: I_OBJ_D;
 //-------  PARTS 1EF ------------------------------------
 wire   [9:0]W_1EF_D = {I_5H_Q7,I_5H_Q6,W_3ML_Y[5:0],W_3ML_Y[0]|W_3ML_Y[1],I_CMPBLKn};
 reg    [9:0]W_1EF_Q;
-wire   W_1EF_RST  =  I_CMPBLKn|W_1EF_Q[0];
-
-always@(posedge CLK_6M or negedge W_1EF_RST)
+// CLK_6M rising edge as CLK_24M enable, synchronous self-reset (CMPBLKn | Q[0])
+always@(posedge CLK_24M)
 begin
-   if(W_1EF_RST == 1'b0) W_1EF_Q <= 1'b0;
-   else                  W_1EF_Q <= W_1EF_D;
+   if(~CLK_6M & CLK_12M) W_1EF_Q <= I_CMPBLKn ? W_1EF_D : 10'h000;
 end   
 
 //-------  PARTS 2EF -------------------------------------------
@@ -58,14 +57,15 @@ wire   [7:0]PAL_AD = I_CNF_EN ? I_CNF_A : W_PAL_AB[7:0];
 wire   [7:0]PAL_DI = I_CNF_EN ? I_CNF_D : 8'h00 ;
 
 //---------------------------------------------------------------
+// palette PROMs read every CLK_24M cycle (was ~CLK_12M, same edge as CLK_6M)
 pal2_rom PAL2(
-   .clk(~CLK_12M),
+   .clk(CLK_24M),
    .addr(PAL_AD),
    .data(W_2F_DO)
    );
 //---------------------------------------------------------------
 pal1_rom PAL1(
-   .clk(~CLK_12M),
+   .clk(CLK_24M),
    .addr(PAL_AD),
    .data(W_2E_DO)
    );

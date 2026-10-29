@@ -205,14 +205,14 @@ reg    [1:0]clk_d;
 reg    [3:0]phase;
 
 reg [14:0] rd_addr;
-reg [ 7:0] do_dkongjr_prog;
-reg [ 7:0] do_dkongjr_vid1;
-reg [ 7:0] do_dkongjr_vid2;
-reg [ 7:0] do_dkongjr_obj1;
-reg [ 7:0] do_dkongjr_obj2;
-reg [ 7:0] do_dkongjr_obj3;
-reg [ 7:0] do_dkongjr_obj4;
-reg [ 7:0] do_dkongjr_wav;
+wire [ 7:0] do_dkongjr_prog;
+wire [ 7:0] do_dkongjr_vid1;
+wire [ 7:0] do_dkongjr_vid2;
+wire [ 7:0] do_dkongjr_obj1;
+wire [ 7:0] do_dkongjr_obj2;
+wire [ 7:0] do_dkongjr_obj3;
+wire [ 7:0] do_dkongjr_obj4;
+wire [ 7:0] do_dkongjr_wav;
 
 //-------------------- CPU ROM --------------------------------
 CPUROM dkongjr_prog(
@@ -590,6 +590,7 @@ dkongjr_obj obj
 dkongjr_vram vram
 (
 	// input
+	.CLK_24M(I_CLK_24576M),
 	.CLK_12M(~W_CLK_12288M),
 	.I_AB(W_CPU_A[9:0]),
 	.I_DB(W_CPU_DO),
@@ -627,6 +628,7 @@ wire   [1:0]W_B;
 dkongjr_col_pal cpal
 (
 	// input
+	.CLK_24M(I_CLK_24576M),
 	.CLK_6M(W_H_CNT[0]),
 	.CLK_12M(W_CLK_12288M),
 	.I_VRAM_D(W_VRAM_DAT),

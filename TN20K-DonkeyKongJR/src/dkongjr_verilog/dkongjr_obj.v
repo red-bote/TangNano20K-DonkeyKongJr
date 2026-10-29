@@ -152,28 +152,39 @@ always@(posedge CLK_12M) W_7H <= ~(W_78P_Q[7]&W_78P_Q[6]&W_78P_Q[5]&W_78P_Q[4]);
 
 reg    [7:0]W_5L_Q;
 reg    CLK_4L;
-always@(negedge CLK_24M) CLK_4L = ~(I_H_CNT[0]&(~I_H_CNT[1]));
+wire   CLK_4L_D = ~(I_H_CNT[0]&(~I_H_CNT[1]));
+always@(negedge CLK_24M) CLK_4L = CLK_4L_D;
 
 wire   W_6L = ~(W_5L_Q[6]|W_5L_Q[7]);
 wire   W_3P = ~(I_H_CNT[2]&I_H_CNT[3]&I_H_CNT[4]&I_H_CNT[5]&I_H_CNT[6]&I_H_CNT[7]&I_H_CNT[8] & W_6L);
 
 //-- U_4L ---------------
 
+// CLK_4L rising edge as CLK_24M enable
 reg    W_4L_Q;
 wire   RST_4L = ~I_H_CNT[9];
-always@(posedge CLK_4L or negedge RST_4L)
+wire   W_4L_D = (CLK_4L_D & ~CLK_4L) ? ~(W_7H&W_3P) : W_4L_Q;
+always@(negedge CLK_24M or negedge RST_4L)
 begin
    if(RST_4L == 0) W_4L_Q <= 1'b0;
-   else            W_4L_Q <= ~(W_7H&W_3P);
+   else            W_4L_Q <= W_4L_D;
 end
 
+// 7M write enable (active low), all terms are CLK_24M registers
 wire   CLK_5L = ~(CLK_12M&(~I_H_CNT[9])&W_4L_Q&W_6L);
 
+// 5L steps once per CLK_12M high phase with the CLK_5L term active, after the 7M write
 wire   W_5L_RST = ~I_H_CNT[9];
-always@(posedge CLK_5L or negedge W_5L_RST)
+reg    W_5L_EN;
+always@(negedge CLK_24M or negedge W_5L_RST)
+begin
+   if(W_5L_RST == 1'b0) W_5L_EN <= 1'b0;
+   else                 W_5L_EN <= CLK_12M & W_6L & (W_4L_Q | W_4L_D);
+end
+always@(posedge CLK_24M or negedge W_5L_RST)
 begin
    if(W_5L_RST == 1'b0) W_5L_Q <= 0;
-   else                 W_5L_Q <= W_5L_Q +1;
+   else if(W_5L_EN & CLK_12M) W_5L_Q <= W_5L_Q +1;
 end
 
 //------  PARTS 6M  ----------------------------------------------
@@ -199,11 +210,14 @@ wire   [7:0]W_78J_B = W_VFC_CNT[7:0];
 wire   [8:0]W_78J_Q = W_78J_A + W_78J_B;
 wire   [7:0]W_8H_D = W_78J_Q[7:0];
 
+// 5F2 strobes as CLK_24M enables: capture before the edge where 7M data changes
+wire   [3:0]W_5F2_RISE = W_5F2_QB & ~W_5F2_Q;
+
 reg    [7:0]W_8H_Q;
-always@(posedge W_5F2_Q[0]) W_8H_Q <= W_8H_D;
+always@(negedge CLK_24M) if(W_5F2_RISE[0]) W_8H_Q <= W_8H_D;
 
 reg    [7:0]W_6J_Q;
-always@(posedge W_5F2_Q[2]) W_6J_Q <= W_HD[7:0];
+always@(negedge CLK_24M) if(W_5F2_RISE[2]) W_6J_Q <= W_HD[7:0];
 
 wire   [7:0]W_6K_D = {W_6J_Q[7],I_CMPBLKn,~I_H_CNT[9],
                       ~(I_H_CNT[9]|W_FLIP_2),W_6J_Q[3:0]};
@@ -217,31 +231,23 @@ end
 
 assign O_L_CMPBLKn = W_6K_Q[6];
 
-wire   W_8N_Q;
-
-logic_74xx109 U_8N(
-
-.CLK(W_5F2_Q[0]),
-.RST(I_H_CNT[9]),
-.I_J(~W_RAM_7M_DOBn[0]),
-.I_K(1'b1),
-.O_Q(W_8N_Q)
-
-);
+// 74xx109 U_8N (J = ~7M[0], K = 1) with the 5F2 enable
+reg    W_8N_Q;
+always@(negedge CLK_24M or negedge I_H_CNT[9])
+begin
+   if(I_H_CNT[9] == 1'b0) W_8N_Q <= 1'b0;
+   else if(W_5F2_RISE[0] & ~W_RAM_7M_DOBn[0]) W_8N_Q <= 1'b1;
+end
 
 wire   W_6F = ~(W_8H_Q[4]&W_8H_Q[5]&W_8H_Q[6]&W_8H_Q[7]);
 wire   W_5J = W_8N_Q|W_6F;
 wire   W_6L1 = ~(W_5J|W_5B);
 
 //------  PARTS 6H  ----------------------------------------------       
+// latch as CLK_24M register: holds W_HD from before the 5F2[1] rising edge
 wire   W_6H_G = ~W_5F2_Q[1];
 reg    [7:0]W_6H_Q;
-always@(W_6H_G or W_HD[7:0])
-begin
-   if(W_6H_G) W_6H_Q <= W_HD[7:0];
-   //else
-   //   W_6H_Q <= W_6H_Q;
-end
+always@(negedge CLK_24M) if(W_6H_G) W_6H_Q <= W_HD[7:0];
 //----------------------------------------------------------------
 
 wire   [10:0]W_ROM_OBJ_AB;
@@ -304,15 +310,17 @@ assign W_8B_Y = W_6K_Q[7] ? W_8B_B:W_8B_A;
 
 //------  PRATS 3E & 4E  -----------------------------------------
 reg    CLK_3E;
+wire   CLK_3E_D = ~(~(I_H_CNT[0]&W_6K_Q[5])& CLK_12M);
 always@(negedge CLK_24M)
-   CLK_3E <= ~(~(I_H_CNT[0]&W_6K_Q[5])& CLK_12M);
+   CLK_3E <= CLK_3E_D;
 
 wire   [7:0]W_3E_LD_DI = W_78K_Q[7:0];
 
 wire   W_3E_RST = W_5F1_Q[3]|W_6K_Q[5];
 wire   W_3E_LD  = W_5F1_Q[1];
 reg    [7:0]W_3E_Q;
-always@(posedge CLK_3E)
+// CLK_3E rising edge as CLK_24M enable: X load before the edge where 7M data changes
+always@(negedge CLK_24M) if(CLK_3E_D & ~CLK_3E)
 begin
    if(W_3E_LD == 1'b0) 
       W_3E_Q <= W_3E_LD_DI;

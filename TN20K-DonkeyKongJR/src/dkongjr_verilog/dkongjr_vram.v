@@ -32,6 +32,7 @@
 
 module dkongjr_vram(
 
+CLK_24M,
 CLK_12M,
 I_AB,
 I_DB,
@@ -59,6 +60,7 @@ O_ESBLKn
 
 );
 
+input  CLK_24M;
 input  CLK_12M;
 input  [9:0]I_AB;
 input  [7:0]I_DB;
@@ -98,7 +100,8 @@ wire        W_vram_CS = I_CMPBLK ? 1'b0     : I_VRAM_WRn & I_VRAM_RDn;
 wire        W_2S4     = I_CMPBLK ? 1'b0     : 1'b1 ;
 
 reg    CLK_2M;
-always@(negedge CLK_12M) CLK_2M <= ~(I_H_CNT[1]&I_H_CNT[2]&I_H_CNT[3]);
+// CLK_12M (inverted 12 MHz) falling edge as CLK_24M enable
+always@(posedge CLK_24M) if(CLK_12M) CLK_2M <= ~(I_H_CNT[1]&I_H_CNT[2]&I_H_CNT[3]);
 
 ram_1024_8 U_2PR(
 
@@ -128,8 +131,9 @@ wire   [3:0]W_2N_DI = I_CNF_EN ? I_CNF_D[3:0] : 4'h0 ;
 //);
 
 //--------------------------------------------------------------
+// 2N read every CLK_24M cycle: no sampling on the edge where its address changes
 col_rom COL_ROM(
-   .clk(CLK_12M),
+   .clk(CLK_24M),
    .addr(W_2N_AD),
    .data(W_2N_DO[3:0])
    );
@@ -141,7 +145,8 @@ reg    [3:0]O_COL;
 // Delay added to colour output. Temporary fix for colour timing issue.
 // Further investigation needed.
 reg prev;
-always@(negedge I_H_CNT[0]) begin
+// I_H_CNT[0] falling edge as CLK_24M enable
+always@(posedge CLK_24M) if(I_H_CNT[0] & ~CLK_12M) begin
 
 	prev <= CLK_2M;
 
