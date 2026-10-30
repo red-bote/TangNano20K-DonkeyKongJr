@@ -157,6 +157,9 @@ begin
 
 ---------------------------------------------------------------------------
     dkongjr : entity work.dkongjr_main
+    generic map (
+        WAV_AW => 16 -- full wave ROM address
+    )
     port map (
         I_CLK_24576M   => clk_sys,
         I_RESETn       => not reset,

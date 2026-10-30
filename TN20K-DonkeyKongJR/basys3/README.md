@@ -62,11 +62,11 @@ From a Vivado 2020.2 build:
 
 | Resource  | Used       | Util.                          |
 |-----------|------------|--------------------------------|
-| LUTs      | 2278       | 10.95%                         |
+| LUTs      | 2284       | 10.98%                         |
 | Registers | 1028       | 2.47%                          |
 | Block RAM | 33 tiles   | 66.00%                         |
 | DSPs      | 0          | 0.00%                          |
-| Clock     | 24.576 MHz | WNS +15.489 ns, WHS +0.122 ns  |
+| Clock     | 24.576 MHz | WNS +15.392 ns, WHS +0.090 ns  |
 
 ## Core changes for the Basys 3 port
 
@@ -78,6 +78,24 @@ project). The faults below were seen on the Basys 3 and not checked on the Tang 
 - Colour bleeding, flicker: tile colour logic on clock enables (`dkongjr_vram.v`,
   `dkongjr_col_pal.v`, `dkongjr_main.v`).
 - Vivado synthesis error: PROM outputs as `wire` (`dkongjr_main.v`).
+- Sounds playing wrong samples: full wave ROM address on Basys 3 (`dkongjr_main.v`).
+
+## Sound samples
+
+- The original board makes the walk, jump, land and fall sounds with analog circuits.
+  This core plays samples instead (`tools/dkj_wave.bin`, 48 KB, 8-bit unsigned,
+  11 kHz).
+- `dkj_wave.bin` is an 8-bit conversion of the 16-bit `releases/dkj_wave.bin` in
+  gaz68's MiSTer core (<https://github.com/gaz68/Arcade-DonkeyKongJunior_MiSTer>).
+- gaz68's samples are MAME's former `dkongjr` sample set (22 kHz WAVs, removed in
+  MAME 0.122u2), at half the sample rate. Climb matches less closely than the others.
+  That sample set is separate from the `dkongjr.zip` ROM set.
+- Upstream reduces the sample ROM address to 13 bits to fit the Tang Nano 20K, so jump,
+  land and fall play walk data there. The Basys 3 build uses the full address.
+- Walk, land and fall still stop before the end of their sample data. The sound player
+  (`dkongjr_wav_sound.v`) plays a set number of samples for each sound. For fall that
+  is 0.5 s of the 1.8 s recorded. Full play lengths for the Basys 3 are planned as the
+  next change.
 
 ## Third-party additions
 

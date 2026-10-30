@@ -40,7 +40,8 @@
 //	`define DIP_BOUNS  2'b11  // 20000
 
 
-module dkongjr_main
+// WAV_AW: wave ROM address bits, 13 fits the Tang Nano 20K, 16 = full ROM
+module dkongjr_main #(parameter WAV_AW = 13)
 (
 	//    FPGA_USE
 	input  I_CLK_24576M,
@@ -259,7 +260,7 @@ ROM7F dkongjr_obj4(
 //-------------------- WAV_ROM --------------------------------
 ROMWAV ROMWAV(
 	.clk(~W_CLK_12288M),
-	.addr(WAV_ROM_A[12:0]), //reduced from 15:0 to fit tn20k // some sounds will suffer
+	.addr(WAV_ROM_A[15:0] & ((16'h1 << WAV_AW) - 16'h1)), // WAV_AW < 16: some sounds play wrong data
 	.data(do_dkongjr_wav)
 );
 //-------------------------------------------------------------
