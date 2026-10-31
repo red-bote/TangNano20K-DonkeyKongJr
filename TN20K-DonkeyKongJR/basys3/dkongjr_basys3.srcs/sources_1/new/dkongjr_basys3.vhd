@@ -158,7 +158,12 @@ begin
 ---------------------------------------------------------------------------
     dkongjr : entity work.dkongjr_main
     generic map (
-        WAV_AW => 16 -- full wave ROM address
+        WAV_AW => 16, -- full wave ROM address
+        -- full sample lengths, last sample of each ROM slot
+        WAV_WALK_CNT => 16#07FF#,
+        WAV_JUMP_CNT => 16#1FFF#,
+        WAV_LAND_CNT => 16#1FFF#,
+        WAV_FALL_CNT => 16#4FFF#
     )
     port map (
         I_CLK_24576M   => clk_sys,

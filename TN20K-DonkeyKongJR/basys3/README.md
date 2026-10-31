@@ -78,24 +78,23 @@ project). The faults below were seen on the Basys 3 and not checked on the Tang 
 - Colour bleeding, flicker: tile colour logic on clock enables (`dkongjr_vram.v`,
   `dkongjr_col_pal.v`, `dkongjr_main.v`).
 - Vivado synthesis error: PROM outputs as `wire` (`dkongjr_main.v`).
-- Sounds playing wrong samples: full wave ROM address on Basys 3 (`dkongjr_main.v`).
+- Wrong, cut short or never-ending sounds: sample playback (`dkongjr_main.v`,
+  `dkongjr_wav_sound.v`), see Sound samples.
 
 ## Sound samples
 
-- The original board makes the walk, jump, land and fall sounds with analog circuits.
-  This core plays samples instead (`tools/dkj_wave.bin`, 48 KB, 8-bit unsigned,
-  11 kHz).
-- `dkj_wave.bin` is an 8-bit conversion of the 16-bit `releases/dkj_wave.bin` in
-  gaz68's MiSTer core (<https://github.com/gaz68/Arcade-DonkeyKongJunior_MiSTer>).
-- gaz68's samples are MAME's former `dkongjr` sample set (22 kHz WAVs, removed in
-  MAME 0.122u2), at half the sample rate. Climb matches less closely than the others.
-  That sample set is separate from the `dkongjr.zip` ROM set.
-- Upstream reduces the sample ROM address to 13 bits to fit the Tang Nano 20K, so jump,
-  land and fall play walk data there. The Basys 3 build uses the full address.
-- Walk, land and fall still stop before the end of their sample data. The sound player
-  (`dkongjr_wav_sound.v`) plays a set number of samples for each sound. For fall that
-  is 0.5 s of the 1.8 s recorded. Full play lengths for the Basys 3 are planned as the
-  next change.
+Walk, jump, land and fall are played from samples (`tools/dkj_wave.bin`, 8-bit,
+11 kHz) in place of the original board's analog sound circuits. The samples are MAME's
+former `dkongjr` sample set (removed in MAME 0.122u2, separate from the `dkongjr.zip`
+ROM set), at half rate, as used in the gaz68 MiSTer core
+(<https://github.com/gaz68/Arcade-DonkeyKongJunior_MiSTer>).
+
+The Basys 3 build restores the sample handling of that core:
+
+- Full sample ROM address. The Tang Nano 20K build uses 13 bits to fit, so jump, land
+  and fall play walk data there.
+- Each sample plays to the end of its slot, not a fixed shorter count.
+- The fall sound stops when the fall ends (both builds).
 
 ## Third-party additions
 

@@ -63,8 +63,8 @@ reg    [1:0]sw0,sw1,sw2,sw3;
 reg    [3:0]status0;
 reg    [3:0]status1;
 reg    [2:0]status2;
-reg    [12:0]ad_cnt;
-reg    [12:0]end_cnt;
+reg    [14:0]ad_cnt;
+reg    [14:0]end_cnt;
 
 always@(posedge I_CLK or negedge I_RSTn)
 begin
@@ -110,6 +110,10 @@ begin
         status2 <= 3'b001;
         end_cnt <= Foot_cnt;
       end
+    end else if(status1[3] & ~sw3[0])begin
+      // fall plays only while 5H[1] is high
+      status1 <= 4'b0000;
+      ad_cnt <= end_cnt;
     end else begin
       if(sample_pls)begin
         if(ad_cnt >= end_cnt)begin
@@ -129,7 +133,7 @@ reg   [15:0]wav_ad;
 wire  [3:0]walk_offset = {3'b000,ad_cnt[11]} + I_MSAMPLE;
 wire  [3:0]jump_offset = {3'b000,ad_cnt[12]} + 4'h3;
 wire  [3:0]foot_offset = {3'b000,ad_cnt[12]} + 4'h5;
-wire  [3:0]fall_offset = {3'b000,ad_cnt[12]} + 4'h7;
+wire  [3:0]fall_offset = {1'b0,ad_cnt[14:12]} + 4'h7;
 
 always@(posedge I_CLK)
 begin

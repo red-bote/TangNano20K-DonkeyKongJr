@@ -41,7 +41,14 @@
 
 
 // WAV_AW: wave ROM address bits, 13 fits the Tang Nano 20K, 16 = full ROM
-module dkongjr_main #(parameter WAV_AW = 13)
+// WAV_*_CNT: last sample played per sound (dkongjr_wav_sound)
+module dkongjr_main #(
+	parameter WAV_AW = 13,
+	parameter WAV_WALK_CNT = 13'h01f4,
+	parameter WAV_JUMP_CNT = 13'h1e20,
+	parameter WAV_LAND_CNT = 13'h1750,
+	parameter WAV_FALL_CNT = 13'h1750
+)
 (
 	//    FPGA_USE
 	input  I_CLK_24576M,
@@ -951,7 +958,12 @@ begin
    end
 end
 
-dkongjr_wav_sound Analog_sound
+dkongjr_wav_sound #(
+	.Walk_cnt(WAV_WALK_CNT),
+	.Jump_cnt(WAV_JUMP_CNT),
+	.Foot_cnt(WAV_LAND_CNT),
+	.Fall_cnt(WAV_FALL_CNT)
+) Analog_sound
 (
 	.O_ROM_AB(WAV_ROM_A),
 	.I_ROM_DB(WAV_ROM_DO),
