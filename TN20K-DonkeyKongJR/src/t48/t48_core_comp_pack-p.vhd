@@ -26,6 +26,7 @@ package t48_core_comp_pack is
 
     port (
       xtal_i       : in  std_logic;
+      xtal_en_i    : in  std_logic;
       reset_i      : in  std_logic;
       t0_i         : in  std_logic;
       t0_o         : out std_logic;

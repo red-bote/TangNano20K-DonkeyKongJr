@@ -21,6 +21,7 @@
 module I8035IP(
 
 I_CLK,
+I_CLK_EN,
 I_RSTn,
 I_INTn,
 I_EA,
@@ -42,6 +43,7 @@ O_P2
 );
 
 input  I_CLK;
+input  I_CLK_EN; // XTAL edge enable on I_CLK (1 when I_CLK is the XTAL clock)
 input  I_RSTn;
 input  I_INTn;
 input  I_EA;
@@ -83,7 +85,7 @@ wire   [7:0]t48_ram_di;
         .dout(t48_ram_do), //output [7:0] dout
         .clk(I_CLK), //input clk
         .oce(1'b1), //input oce
-        .ce(1'b1), //input ce
+        .ce(I_CLK_EN), //input ce
         .reset(1'b0), //input reset
         .wre(t48_ram_we), //input wre
         .ad(t48_ram_a[5:0]), //input [5:0] ad
@@ -96,6 +98,7 @@ wire   xtal3_s;
 t48_core t48_core(
 
 .xtal_i(I_CLK),
+.xtal_en_i(I_CLK_EN),
 .reset_i(I_RSTn),
 .t0_i(I_T0),
 .t0_o(O_T0),
@@ -118,7 +121,7 @@ t48_core t48_core(
 .p1_low_imp_o(),
 .prog_n_o(O_PROGn),
 .clk_i(I_CLK),
-.en_clk_i(xtal3_s),
+.en_clk_i(xtal3_s & I_CLK_EN),
 .xtal3_o(xtal3_s),
 .dmem_addr_o(t48_ram_a),
 .dmem_we_o(t48_ram_we),

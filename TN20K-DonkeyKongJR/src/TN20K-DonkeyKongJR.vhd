@@ -117,6 +117,7 @@ dkongjr : entity work.dkongjr_main
  I_S2		    => not joy_BBBBFRLDU(6),    -- P2 start
  I_C1		    => joy_BBBBFRLDU(7),        -- Coin
  I_DIP_SW		=> "10000000",
+ I_SND_OPT		=> "000",
  O_VGA_R		=> M_VIDEO_R,
  O_VGA_G		=> M_VIDEO_G,
  O_VGA_B		=> M_VIDEO_B,

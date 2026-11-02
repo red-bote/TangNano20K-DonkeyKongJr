@@ -29,6 +29,7 @@
 --   reset                                       btnC
 --  Switches: sw15 audio off, sw14 gain, sw13 15 kHz RGB, sw0-sw7 DIP
 --  DIP bits: lives 1:0, bonus 3:2, coinage 6:4, cabinet 7, switch down = default
+--  Sound (up): sw8 1-channel samples, sw9 filter off, sw10 decay off
 --  Clock: 1 MMCM, 24.576 MHz from 100 MHz, single clock domain
 --
 -- DIP values and other details: see basys3/README.md
@@ -158,6 +159,8 @@ begin
 ---------------------------------------------------------------------------
     dkongjr : entity work.dkongjr_main
     generic map (
+        SND_EXT => 1, -- sound options on sw8-sw10
+        T48_CE => 1, -- sound CPU on the main clock with an enable
         WAV_AW => 16, -- full wave ROM address
         -- full sample lengths, last sample of each ROM slot
         WAV_WALK_CNT => 16#07FF#,
@@ -182,6 +185,7 @@ begin
         I_S2           => not joy_BBBBFRLDU(6),    -- P2 start
         I_C1           => joy_BBBBFRLDU(7),        -- Coin
         I_DIP_SW       => dip_sw,
+        I_SND_OPT      => sw(10 downto 8),
         O_VGA_R        => M_VIDEO_R,
         O_VGA_G        => M_VIDEO_G,
         O_VGA_B        => M_VIDEO_B,

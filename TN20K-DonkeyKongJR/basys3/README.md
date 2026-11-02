@@ -42,6 +42,7 @@ make clean       # remove roms, PROM VHDL and Vivado outputs
 | btnC            | reset                                         |
 | JXADC 1/2/3/4/7 | joystick right/left/down/up/jump (active low) |
 | sw0-sw7         | DIP switches (down = default, see below)      |
+| sw8-sw10        | sound options (down = default, see Sound)     |
 | sw13 down       | 31 kHz VGA                                    |
 | sw13 up         | 15 kHz TV, composite sync on HS (not tested)  |
 | sw14 up         | PmodAMP2 gain                                 |
@@ -78,10 +79,13 @@ project). The faults below were seen on the Basys 3 and not checked on the Tang 
 - Colour bleeding, flicker: tile colour logic on clock enables (`dkongjr_vram.v`,
   `dkongjr_col_pal.v`, `dkongjr_main.v`).
 - Vivado synthesis error: PROM outputs as `wire` (`dkongjr_main.v`).
-- Wrong, cut short or never-ending sounds: sample playback (`dkongjr_main.v`,
-  `dkongjr_wav_sound.v`), see Sound samples.
+- Tile and sound CPU timing races: clock enables (`dkongjr_vram.v`, `i8035ip.v`, T48
+  `clock_ctrl.vhd`, `t48_core.vhd`).
+- Wrong, missing, cut short or never-ending sounds, music without decay: sound options
+  (`dkongjr_main.v`, `dkongjr_wav_sound.v`, new `dkongjr_wav_dma.v`, `dkongjr_dac.sv`,
+  `dkongjr_iir_filter.v`), see Sound.
 
-## Sound samples
+## Sound
 
 Walk, jump, land and fall are played from samples (`tools/dkj_wave.bin`, 8-bit,
 11 kHz) in place of the original board's analog sound circuits. The samples are MAME's
@@ -89,17 +93,42 @@ former `dkongjr` sample set (removed in MAME 0.122u2, separate from the `dkongjr
 ROM set), at half rate, as used in the gaz68 MiSTer core
 (<https://github.com/gaz68/Arcade-DonkeyKongJunior_MiSTer>).
 
-The Basys 3 build restores the sample handling of that core:
+The Basys 3 build restores the sound handling of that core, selectable with switches
+(down = default):
 
-- Full sample ROM address. The Tang Nano 20K build uses 13 bits to fit, so jump, land
-  and fall play walk data there.
-- Each sample plays to the end of its slot, not a fixed shorter count.
-- The fall sound stops when the fall ends (both builds).
+| Switch | Down (default)             | Up                 |
+|--------|----------------------------|--------------------|
+| sw8    | four-channel sample player | one-channel player |
+| sw9    | music/effects filter on    | filter off         |
+| sw10   | music/effects decay on     | decay off          |
+
+- Four-channel player: sounds can overlap (e.g. walking during a jump), full sample
+  ROM address and full sample lengths. The fall sound stops when the fall ends.
+- One-channel player (as in the Tang Nano 20K build, with full address and lengths
+  here): one sound at a time, by priority.
+- The Tang Nano 20K build keeps the one-channel player with a 13-bit sample address to
+  fit, so jump, land and fall play walk data there. Its fall sound also stops when the
+  fall ends.
 
 ## Third-party additions
 
-- `tools/tools_prom_src/src/make_vhdl_prom.c`: PROM-to-VHDL converter by darfpga,
-  unmodified from <https://github.com/pinballwizz/DE2-Xevious> (commit `a5d9eed`).
+PROM tool, unmodified, from <https://github.com/pinballwizz/DE2-Xevious> (commit
+`a5d9eed`):
+
+| File                                        | Function                   | Author  |
+|---------------------------------------------|----------------------------|---------|
+| `tools/tools_prom_src/src/make_vhdl_prom.c` | PROM-to-VHDL converter     | darfpga |
+
+Sound, from the gaz68 MiSTer core (commit `c38f456`), in `src/dkongjr_verilog/`:
+
+| File                   | Function                   | Author              |
+|------------------------|----------------------------|---------------------|
+| `dkongjr_wav_dma.v`    | four-channel sample player | gaz68               |
+| `dkongjr_dac.sv`       | digital sound decay        | gaz68               |
+| `dkongjr_iir_filter.v` | low-pass filter            | Gregory Hogan (MIT) |
+
+Changes: `dkongjr_wav_dma.v` is `dkongjr_wav_sound.v` there, module renamed, volume
+multiply optional. All multiplies are kept out of DSP blocks.
 
 ## License
 

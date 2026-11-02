@@ -42,7 +42,14 @@
 
 // WAV_AW: wave ROM address bits, 13 fits the Tang Nano 20K, 16 = full ROM
 // WAV_*_CNT: last sample played per sound (dkongjr_wav_sound)
+// T48_CE: 1 = sound CPU on I_CLK_24576M with an XTAL enable at the 6.144 MHz rising
+// edges, 0 = sound CPU clocked by WB_CLK_06144M
+// SND_EXT: 1 = extended sound, selected at run time by I_SND_OPT: four-channel sample
+// player (dkongjr_wav_dma), digital sound decay (dkongjr_dac), low-pass filter
+// (iir_2nd_order). 0 = one-channel player only, I_SND_OPT unused.
 module dkongjr_main #(
+	parameter SND_EXT = 0,
+	parameter T48_CE = 0,
 	parameter WAV_AW = 13,
 	parameter WAV_WALK_CNT = 13'h01f4,
 	parameter WAV_JUMP_CNT = 13'h1e20,
@@ -66,7 +73,9 @@ module dkongjr_main #(
 	input  I_S1,I_S2,I_C1,
 
 	input  [7:0] I_DIP_SW,
-	
+	// SND_EXT = 1: [0] one-channel player, [1] filter off, [2] decay off
+	input  [2:0] I_SND_OPT,
+
 	//    VGA (VIDEO) IF
 	output [2:0]O_VGA_R,
 	output [2:0]O_VGA_G,
@@ -186,6 +195,7 @@ wire   [15:0]W_ROM_AB = W_CPU_A ;
 
 wire  [18:0]WAV_ROM_A;
 reg   [7:0]WAV_ROM_DO;
+wire  [15:0]WAV_ROM_ADDR; // from the selected sample player
 wire  [11:0]VID_ROM_A;
 wire  [11:0]OBJ_ROM_A;
 
@@ -267,7 +277,7 @@ ROM7F dkongjr_obj4(
 //-------------------- WAV_ROM --------------------------------
 ROMWAV ROMWAV(
 	.clk(~W_CLK_12288M),
-	.addr(WAV_ROM_A[15:0] & ((16'h1 << WAV_AW) - 16'h1)), // WAV_AW < 16: some sounds play wrong data
+	.addr(WAV_ROM_ADDR),
 	.data(do_dkongjr_wav)
 );
 //-------------------------------------------------------------
@@ -679,7 +689,9 @@ wire    [7:0]I8035_PBO;
 wire    I8035_ALE;
 wire    I8035_RDn;
 wire    I8035_PSENn;
-wire    I8035_CLK = WB_CLK_06144M;
+wire    I8035_CLK = T48_CE ? I_CLK_24576M : WB_CLK_06144M;
+// 6.144 MHz rising edge: H_CNT_r[1:0] = 01 before the CLK_24M edge
+wire    I8035_CLK_EN = T48_CE ? (~W_H_CNT[0] & W_CLK_12288M) : 1'b1;
 wire    I8035_INTn;
 wire    I8035_T0;
 wire    I8035_T1;
@@ -688,6 +700,7 @@ wire    I8035_RSTn;
 I8035IP SOUND_CPU
 (
 	.I_CLK(I8035_CLK),
+	.I_CLK_EN(I8035_CLK_EN),
 	.I_RSTn(I8035_RSTn),
 	.I_INTn(I8035_INTn),
 	.I_EA(1'b1),
@@ -975,6 +988,12 @@ dkongjr_wav_sound #(
 );
 
 
+wire   [15:0]WAV_ROM_A_MASK = WAV_ROM_A[15:0] & ((16'h1 << WAV_AW) - 16'h1); // WAV_AW < 16: some sounds play wrong data
+
+generate if (SND_EXT == 0) begin : snd_basic
+
+assign WAV_ROM_ADDR = WAV_ROM_A_MASK;
+
 //  SOUND MIXER (WAV + DIG ) -----------------------
 wire   [8:0]sound_mix = {1'b0, WAV_ROM_DO} + {1'b0, W_D_S_DAT};
 //wire   [8:0]sound_mix = {1'b0, 7'b0} + {1'b0, W_D_S_DAT};
@@ -987,10 +1006,170 @@ begin
    else if(sound_mix <= 9'h080)// NEG Limiter
       dac_di <= 9'h000;
    else
-      dac_di <= sound_mix - 9'h080; 
+      dac_di <= sound_mix - 9'h080;
 end
 
 assign O_SOUND_DAT = dac_di;
+
+end else begin : snd_ext
+
+// I_SND_OPT: [0] one-channel player, [1] filter off, [2] decay off
+wire   W_OPT_1CH   = I_SND_OPT[0];
+wire   W_OPT_NOFLT = I_SND_OPT[1];
+wire   W_OPT_NODEC = I_SND_OPT[2];
+
+//------ Four-channel sample player ------------------------------------------
+// The channels share the wave ROM: each sets the address at W_H_CNT 0/2/4/6 and takes
+// the data at 1/3/5/7. The 8-bit unsigned samples are widened to 16-bit signed.
+wire signed [15:0]WAVROM_D = {~do_dkongjr_wav[7], do_dkongjr_wav[6:0], 8'h00};
+wire signed [15:0]WAVROM_DS[0:3];
+wire [15:0]WAVROM_A[0:3];
+reg [15:0]WAVROM_ADDR;
+
+assign WAV_ROM_ADDR = W_OPT_1CH ? WAV_ROM_A_MASK : WAVROM_ADDR;
+
+// Walking/climbing sounds (multi-samples).
+dkongjr_wav_dma walk_climb_sounds
+(
+	.I_CLK(I_CLK_24576M),
+	.I_RSTn(I_RESETn),
+	.I_H_CNT(W_H_CNT[3:0]),
+	.I_DIV(12'd2229), // 24.576Mhz / 2229 = 11,025Hz
+	.I_VOL(4'd3), // 100%, unused with VOL_EN = 0
+	.I_DMA_TRIG(~W_6H_Q[0]),
+	.I_DMA_STOP(1'b0),
+	.I_DMA_CHAN(3'd0),
+	.I_DMA_ADDR({2'b00, W_6H_Q[7] ? multsample : multsample+3, 11'h000}),
+	.I_DMA_LEN(16'h0800),
+	.I_DMA_DATA(WAVROM_D),
+	.O_DMA_ADDR(WAVROM_A[0]),
+	.O_SND(WAVROM_DS[0])
+);
+
+// Jumping sound.
+dkongjr_wav_dma jump_sound
+(
+	.I_CLK(I_CLK_24576M),
+	.I_RSTn(I_RESETn),
+	.I_H_CNT(W_H_CNT[3:0]),
+	.I_DIV(12'd2229),
+	.I_VOL(4'd3),
+	.I_DMA_TRIG(~W_6H_Q[1]),
+	.I_DMA_STOP(1'b0),
+	.I_DMA_CHAN(3'd1),
+	.I_DMA_ADDR(16'h3000),
+	.I_DMA_LEN(16'h2000),
+	.I_DMA_DATA(WAVROM_D),
+	.O_DMA_ADDR(WAVROM_A[1]),
+	.O_SND(WAVROM_DS[1])
+);
+
+// Landing sound.
+dkongjr_wav_dma land_sound
+(
+	.I_CLK(I_CLK_24576M),
+	.I_RSTn(I_RESETn),
+	.I_H_CNT(W_H_CNT[3:0]),
+	.I_DIV(12'd2229),
+	.I_VOL(4'd3),
+	.I_DMA_TRIG(~W_6H_Q[2]),
+	.I_DMA_STOP(1'b0),
+	.I_DMA_CHAN(3'd2),
+	.I_DMA_ADDR(16'h5000),
+	.I_DMA_LEN(16'h2000),
+	.I_DMA_DATA(WAVROM_D),
+	.O_DMA_ADDR(WAVROM_A[2]),
+	.O_SND(WAVROM_DS[2])
+);
+
+// Falling sound, plays while 5H[1] is high.
+dkongjr_wav_dma fall_sound
+(
+	.I_CLK(I_CLK_24576M),
+	.I_RSTn(I_RESETn),
+	.I_H_CNT(W_H_CNT[3:0]),
+	.I_DIV(12'd2229),
+	.I_VOL(4'd3),
+	.I_DMA_TRIG(W_5H_Q[1]),
+	.I_DMA_STOP(~W_5H_Q[1]),
+	.I_DMA_CHAN(3'd3),
+	.I_DMA_ADDR(16'h7000),
+	.I_DMA_LEN(16'h5000),
+	.I_DMA_DATA(WAVROM_D),
+	.O_DMA_ADDR(WAVROM_A[3]),
+	.O_SND(WAVROM_DS[3])
+);
+
+// Wave ROM address bus sharing.
+always @(posedge W_CLK_12288M or negedge I_RESETn)
+begin
+	if(! I_RESETn)
+		WAVROM_ADDR <= 0;
+	else
+		case(W_H_CNT[3:0])
+			0: WAVROM_ADDR <= WAVROM_A[0];
+			2: WAVROM_ADDR <= WAVROM_A[1];
+			4: WAVROM_ADDR <= WAVROM_A[2];
+			6: WAVROM_ADDR <= WAVROM_A[3];
+			default:;
+		endcase
+end
+
+//------ Samples: selected player ---------------------------------------------
+wire signed [18:0]W_SMP_4CH = {{3{WAVROM_DS[0][15]}}, WAVROM_DS[0]} +
+                              {{3{WAVROM_DS[1][15]}}, WAVROM_DS[1]} +
+                              {{3{WAVROM_DS[2][15]}}, WAVROM_DS[2]} +
+                              {{3{WAVROM_DS[3][15]}}, WAVROM_DS[3]};
+wire signed [18:0]W_SMP_1CH = {{3{~WAV_ROM_DO[7]}}, ~WAV_ROM_DO[7], WAV_ROM_DO[6:0], 8'h00};
+wire signed [18:0]W_SMP = W_OPT_1CH ? W_SMP_1CH : W_SMP_4CH;
+
+//------ Digital sound: decay (DAC-08 discharge), low-pass filter ------------
+// The sound CPU enables the decay with P2.7 low.
+wire signed [15:0]W_DIG = {~W_D_S_DAT[7], W_D_S_DAT[6:0], 8'h00};
+wire signed [15:0]W_DIG_DECAY;
+dkongjr_dac dac08
+(
+	.I_CLK(I_CLK_24576M),
+	.I_DECAY_EN(~I8035_PBI[7]),
+	.I_RESET_n(I_RESETn),
+	.I_SND_DAT(W_DIG),
+	.O_SND_DAT(W_DIG_DECAY)
+);
+wire signed [15:0]W_DIG_D = W_OPT_NODEC ? W_DIG : W_DIG_DECAY;
+
+// Second order low pass filter. f= 1916 Hz, Q = 0.74.
+wire signed [15:0]W_DIG_F;
+iir_2nd_order filter
+(
+	.clk(I_CLK_24576M),
+	.reset(~I_RESETn),
+	.div(10'd512), // 24.576Mhz / 512 = 48KHz
+	.A2(-18'sd26649),
+	.A3(18'sd11453),
+	.B1(18'sd215),
+	.B2(18'sd430),
+	.B3(18'sd215),
+	.in(W_DIG_D),
+	.out(W_DIG_F)
+);
+wire signed [15:0]W_DIG_OUT = W_OPT_NOFLT ? W_DIG_D : W_DIG_F;
+
+//------ Mixer: samples + digital sound, 16-bit limiter, 8-bit unsigned out ---
+wire signed [18:0]sound_mix = W_SMP + {{3{W_DIG_OUT[15]}}, W_DIG_OUT};
+reg signed [15:0]dac_di;
+always@(posedge W_CLK_12288M)
+begin
+   if(sound_mix >= 19'sh07FFF)      // POS Limiter
+      dac_di <= 16'sh7FFF;
+   else if(sound_mix <= -19'sh08000)// NEG Limiter
+      dac_di <= -16'sh8000;
+   else
+      dac_di <= sound_mix[15:0];
+end
+
+assign O_SOUND_DAT = {~dac_di[15], dac_di[14:8]}; // signed to 8-bit unsigned
+
+end endgenerate
 
 endmodule
 

@@ -7,6 +7,13 @@
 set_property -dict { PACKAGE_PIN W5   IOSTANDARD LVCMOS33 } [get_ports clk]
 create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports clk]
 
+## Core clocks derived from the H counter (H_CNT_r wraps at 1536, so bits 0-8 divide
+## exactly): timed against the MMCM clock instead of left unconstrained
+create_generated_clock -name clk_12m -source [get_pins dkongjr/hv/H_CNT_r_reg[0]/C] -divide_by 2 [get_pins dkongjr/hv/H_CNT_r_reg[0]/Q]
+create_generated_clock -name clk_6m -source [get_pins dkongjr/hv/H_CNT_r_reg[0]/C] -divide_by 4 [get_pins dkongjr/hv/H_CNT_r_reg[1]/Q]
+create_generated_clock -name clk_3m -source [get_pins dkongjr/hv/H_CNT_r_reg[0]/C] -divide_by 8 [get_pins dkongjr/hv/H_CNT_r_reg[2]/Q]
+create_generated_clock -name clk_1m5 -source [get_pins dkongjr/hv/H_CNT_r_reg[0]/C] -divide_by 16 [get_pins dkongjr/hv/H_CNT_r_reg[3]/Q]
+
 
 ## Switches
 set_property -dict { PACKAGE_PIN V17   IOSTANDARD LVCMOS33 } [get_ports {sw[0]}]

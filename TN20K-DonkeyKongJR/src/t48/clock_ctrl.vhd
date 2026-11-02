@@ -59,6 +59,7 @@ entity clock_ctrl is
   port (
     clk_i          : in  std_logic;
     xtal_i         : in  std_logic;
+    xtal_en_i      : in  std_logic;
     res_i          : in  std_logic;
     en_clk_i       : in  boolean;
     xtal3_o        : out boolean;
@@ -134,10 +135,12 @@ begin
         xtal_q <= TO_UNSIGNED(0, 2);
 
       elsif xtal_i'event and xtal_i = clk_active_c then
+        if xtal_en_i = '1' then
         if xtal_q < 2 then
           xtal_q <= xtal_q + 1;
         else
           xtal_q <= TO_UNSIGNED(0, 2);
+        end if;
         end if;
 
       end if;
@@ -190,6 +193,7 @@ begin
       wr_q     <= false;
 
     elsif xtal_i'event and xtal_i = clk_active_c then
+      if xtal_en_i = '1' then
 
       case mstate_q is
         when MSTATE5 => 
@@ -252,6 +256,7 @@ begin
         wr_q     <= false;
 
       end case;
+      end if;
 
     end if;
 

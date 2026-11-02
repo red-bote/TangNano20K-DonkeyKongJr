@@ -71,6 +71,7 @@ package t48_comp_pack is
     port (
       clk_i          : in  std_logic;
       xtal_i         : in  std_logic;
+      xtal_en_i      : in  std_logic;
       res_i          : in  std_logic;
       en_clk_i       : in  boolean;
       xtal3_o        : out boolean;

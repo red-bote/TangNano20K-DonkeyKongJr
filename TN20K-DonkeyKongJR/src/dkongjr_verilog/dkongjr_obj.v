@@ -131,11 +131,19 @@ wire        W_obj_CS = W_AB_SEL ? 1'b0     : I_OBJ_WRn & I_OBJ_RDn;
 
 //-------  VFC_CNT[7:0] ------------------------------------------------
 reg    [7:0]W_VFC_CNT;
-always@(negedge I_H_CNT[9]) W_VFC_CNT <= I_VF_CNT;
+// I_H_CNT[9] falling edge, detected one CLK_24M cycle later (VF_CNT is stable there)
+reg    W_H9_D;
+always@(posedge CLK_24M)
+begin
+   W_H9_D <= I_H_CNT[9];
+   if(W_H9_D & ~I_H_CNT[9]) W_VFC_CNT <= I_VF_CNT;
+end
 
+// CLK_12M (a CLK_24M register) as enable: CLK_12M = 1 before its falling edge,
+// 0 before its rising edge
 //------  PARTS 6N
 reg    [7:0]W_6N_Q;
-always@(negedge CLK_12M) W_6N_Q <= I_OBJ_D;
+always@(posedge CLK_24M) if(CLK_12M) W_6N_Q <= I_OBJ_D;
 
 wire   [7:0]W_78R_A = W_6N_Q;
 wire   [7:0]W_78R_B = {4'b1111,I_FLIPn,W_FLIP_1,W_FLIP_1,1'b1}; 
@@ -148,7 +156,7 @@ wire   [7:0]W_78P_B = I_VF_CNT[7:0];
 wire   [8:0]W_78P_Q = W_78P_A + W_78P_B;
 
 reg    W_7H;
-always@(posedge CLK_12M) W_7H <= ~(W_78P_Q[7]&W_78P_Q[6]&W_78P_Q[5]&W_78P_Q[4]);
+always@(posedge CLK_24M) if(~CLK_12M) W_7H <= ~(W_78P_Q[7]&W_78P_Q[6]&W_78P_Q[5]&W_78P_Q[4]);
 
 reg    [7:0]W_5L_Q;
 reg    CLK_4L;
@@ -189,7 +197,7 @@ end
 
 //------  PARTS 6M  ----------------------------------------------
 reg    [7:0]W_6M_Q;
-always@(negedge CLK_12M) W_6M_Q <= W_6N_Q;
+always@(posedge CLK_24M) if(CLK_12M) W_6M_Q <= W_6N_Q;
 //----------------------------------------------------------------
 wire   [5:0]W_RAM_7M_AB  = ~I_H_CNT[9] ? W_5L_Q[5:0]:I_H_CNT[7:2];
 wire   [8:0]W_RAM_7M_DIB = {W_6M_Q[7:0],W_3P};
@@ -223,7 +231,7 @@ wire   [7:0]W_6K_D = {W_6J_Q[7],I_CMPBLKn,~I_H_CNT[9],
                       ~(I_H_CNT[9]|W_FLIP_2),W_6J_Q[3:0]};
 
 reg    [7:0]W_6K_Q;
-always@(posedge CLK_12M)
+always@(posedge CLK_24M) if(~CLK_12M)
 begin
    if(W_5B == 1'b0) W_6K_Q <= W_6K_D;
    else             W_6K_Q <= W_6K_Q;
@@ -275,7 +283,7 @@ reg   [15:0]reg_8CD;
 
 assign W_8C_Qa = reg_8CD[15];
 assign W_8D_Qh = reg_8CD[0];
-always@(posedge CLK_12M)
+always@(posedge CLK_24M) if(~CLK_12M)
 begin
    case(C_8CD)
       2'b00: reg_8CD <= reg_8CD;
@@ -292,7 +300,7 @@ reg   [15:0]reg_8EF;
 
 assign W_8E_Qa = reg_8EF[15];
 assign W_8F_Qh = reg_8EF[0];
-always@(posedge CLK_12M)
+always@(posedge CLK_24M) if(~CLK_12M)
 begin
    case(C_8EF)
       2'b00: reg_8EF <= reg_8EF;

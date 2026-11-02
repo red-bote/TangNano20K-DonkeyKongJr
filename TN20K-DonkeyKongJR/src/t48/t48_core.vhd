@@ -83,6 +83,7 @@ entity t48_core is
   port (
     -- T48 Interface ----------------------------------------------------------
     xtal_i       : in  std_logic;
+    xtal_en_i    : in  std_logic;
     reset_i      : in  std_logic;
     t0_i         : in  std_logic;
     t0_o         : out std_logic;
@@ -320,6 +321,7 @@ begin
     port map (
       clk_i          => clk_i,
       xtal_i         => xtal_i,
+      xtal_en_i      => xtal_en_i,
       res_i          => reset_i,
       en_clk_i       => en_clk_s,
       xtal3_o        => xtal3_s,

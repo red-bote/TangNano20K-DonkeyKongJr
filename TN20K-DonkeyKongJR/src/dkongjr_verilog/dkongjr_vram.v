@@ -168,6 +168,8 @@ wire   [3:0]W_4M_Y;
 wire   W_4P_Qa,W_4P_Qh,W_4N_Qa,W_4N_Qh;
 
 wire   CLK_4PN = I_H_CNT[0];
+// CLK_4PN rising edge as CLK_24M enable (CLK_12M is inverted here): H_CNT_r[1:0] = 01
+wire   CLK_4PN_EN = ~I_H_CNT[0] & ~CLK_12M;
 
 //------  PARTS 4P  ---------------------------------------------- 
 wire   [1:0]C_4P = W_4M_Y[1:0];
@@ -176,7 +178,7 @@ reg    [7:0]reg_4P;
 
 assign W_4P_Qa = reg_4P[7];
 assign W_4P_Qh = reg_4P[0];
-always@(posedge CLK_4PN)
+always@(posedge CLK_24M) if(CLK_4PN_EN)
 begin
    case(C_4P)
       2'b00: reg_4P <= reg_4P;
@@ -192,7 +194,7 @@ reg    [7:0]reg_4N;
 
 assign W_4N_Qa = reg_4N[7];
 assign W_4N_Qh = reg_4N[0];
-always@(posedge CLK_4PN)
+always@(posedge CLK_24M) if(CLK_4PN_EN)
 begin
    case(C_4N)
       2'b00: reg_4N <= reg_4N;
