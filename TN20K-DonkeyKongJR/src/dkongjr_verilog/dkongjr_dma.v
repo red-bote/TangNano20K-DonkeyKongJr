@@ -10,6 +10,7 @@
 module dkongjr_dma
 (
 	input		I_CLK,
+	input		I_CLK_EN, // clock enable (1 with the derived clock)
 	input		I_RSTn,
 	input		I_DMA_TRIG,
 	input		[7:0]I_DMA_DS,
@@ -33,6 +34,7 @@ reg DMA_CESr, DMA_CEDr;
 
 reg old_trig;
 always @(posedge I_CLK)
+if(I_CLK_EN)
 begin
 
 	old_trig <= I_DMA_TRIG;

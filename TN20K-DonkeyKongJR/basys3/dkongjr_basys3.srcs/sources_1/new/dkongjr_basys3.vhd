@@ -160,7 +160,7 @@ begin
     dkongjr : entity work.dkongjr_main
     generic map (
         SND_EXT => 1, -- sound options on sw8-sw10
-        T48_CE => 1, -- sound CPU on the main clock with an enable
+        CLK_CE => 1, -- core logic on the main clock with clock enables
         WAV_AW => 16, -- full wave ROM address
         -- full sample lengths, last sample of each ROM slot
         WAV_WALK_CNT => 16#07FF#,

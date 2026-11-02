@@ -42,14 +42,14 @@
 
 // WAV_AW: wave ROM address bits, 13 fits the Tang Nano 20K, 16 = full ROM
 // WAV_*_CNT: last sample played per sound (dkongjr_wav_sound)
-// T48_CE: 1 = sound CPU on I_CLK_24576M with an XTAL enable at the 6.144 MHz rising
-// edges, 0 = sound CPU clocked by WB_CLK_06144M
+// CLK_CE: 1 = logic on I_CLK_24576M with clock enables at the derived clock edges,
+// 0 = logic clocked by the derived clocks (W_CLK_12288M, W_H_CNT[n])
 // SND_EXT: 1 = extended sound, selected at run time by I_SND_OPT: four-channel sample
 // player (dkongjr_wav_dma), digital sound decay (dkongjr_dac), low-pass filter
 // (iir_2nd_order). 0 = one-channel player only, I_SND_OPT unused.
 module dkongjr_main #(
 	parameter SND_EXT = 0,
-	parameter T48_CE = 0,
+	parameter CLK_CE = 0,
 	parameter WAV_AW = 13,
 	parameter WAV_WALK_CNT = 13'h01f4,
 	parameter WAV_JUMP_CNT = 13'h1e20,
@@ -167,10 +167,29 @@ assign WB_CLK_06144M = W_H_CNT[0];   //  6.144MHz
 assign WB_CLK_12288M = W_CLK_12288M; // 12.288MHz
 assign WB_CLK_03072M = W_H_CNT[1];       //  3.072MHz
 
+// Derived clock edges: clock and enable pairs selected by CLK_CE. With CLK_CE = 1 the
+// enable is true in the I_CLK_24576M cycle before the edge (H_CNT_r = {W_H_CNT,
+// W_CLK_12288M}), with CLK_CE = 0 the enable is 1.
+wire   W_CLK12P = CLK_CE ? I_CLK_24576M : W_CLK_12288M;   // 12.288 MHz rising
+wire   W_CLK12N = CLK_CE ? I_CLK_24576M : ~W_CLK_12288M;  // 12.288 MHz falling
+wire   W_CLK6P  = CLK_CE ? I_CLK_24576M : W_H_CNT[0];     //  6.144 MHz rising
+wire   W_CLK3P  = CLK_CE ? I_CLK_24576M : W_H_CNT[1];     //  3.072 MHz rising
+wire   W_CLK3N  = CLK_CE ? I_CLK_24576M : ~W_H_CNT[1];    //  3.072 MHz falling
+wire   W_CLK15P = CLK_CE ? I_CLK_24576M : W_H_CNT[2];     //  1.536 MHz rising
+wire   W_CE12P  = CLK_CE ? ~W_CLK_12288M : 1'b1;
+wire   W_CE12N  = CLK_CE ? W_CLK_12288M : 1'b1;
+wire   W_CE6P   = CLK_CE ? (W_CLK_12288M & ~W_H_CNT[0]) : 1'b1;
+wire   W_CE3P   = CLK_CE ? (W_CLK_12288M & W_H_CNT[0] & ~W_H_CNT[1]) : 1'b1;
+wire   W_CE3N   = CLK_CE ? (W_CLK_12288M & W_H_CNT[0] & W_H_CNT[1]) : 1'b1;
+wire   W_CE15P  = CLK_CE ? (W_CLK_12288M & W_H_CNT[0] & W_H_CNT[1] & ~W_H_CNT[2]) : 1'b1;
+
 T80as z80core 
  (
 	.RESET_n(I_RESETn),
-	.CLK_n(WB_CLK_03072M),
+	.CLK_n(W_CLK3P),
+	.CLK_F(W_CLK3N),
+	.CEN_p(W_CE3P),
+	.CEN_n(W_CE3N),
 	.WAIT_n(W_CPU_WAITn),
 	.INT_n(1'b1),
 	.NMI_n(W_CPU_NMIn),
@@ -232,51 +251,54 @@ wire [ 7:0] do_dkongjr_obj3;
 wire [ 7:0] do_dkongjr_obj4;
 wire [ 7:0] do_dkongjr_wav;
 
+// PROMs: with CLK_CE = 1 read every I_CLK_24576M cycle (no enable port). The fetch
+// phases below and the wave channels sample the data one cycle after the 12.288 MHz
+// falling edge read, the same data as with the derived clock.
 //-------------------- CPU ROM --------------------------------
 CPUROM dkongjr_prog(
-	.clk(~W_CLK_12288M),
+	.clk(W_CLK12N),
 	.addr(ROM_A_SRAM[14:0]),
 	.data(do_dkongjr_prog)
 );
 //-------------------- VID_ROM1 - 3P --------------------------
 ROM3P dkongjr_vid1(
-	.clk(~W_CLK_12288M),
+	.clk(W_CLK12N),
 	.addr(VID_ROM_A),
 	.data(do_dkongjr_vid1)
 );
 //-------------------- VID_ROM2 - 3N --------------------------
 ROM3N dkongjr_vid2(
-	.clk(~W_CLK_12288M),
+	.clk(W_CLK12N),
 	.addr(W_VC_A[11:0]),
 	.data(do_dkongjr_vid2)
 );
 //-------------------- OBJ_ROM1 - 7C --------------------------
 ROM7C dkongjr_obj1(
-	.clk(~W_CLK_12288M),
+	.clk(W_CLK12N),
 	.addr(OBJ_ROM_A),
 	.data(do_dkongjr_obj1)
 );
 //-------------------- OBJ_ROM2 - 7D --------------------------
 ROM7D dkongjr_obj2(
-	.clk(~W_CLK_12288M),
+	.clk(W_CLK12N),
 	.addr(OBJ_ROM_A),
 	.data(do_dkongjr_obj2)
 );
 //-------------------- OBJ_ROM2 - 7E --------------------------
 ROM7E dkongjr_obj3(
-	.clk(~W_CLK_12288M),
+	.clk(W_CLK12N),
 	.addr(OBJ_ROM_A),
 	.data(do_dkongjr_obj3)
 );
 //-------------------- OBJ_ROM2 - 7F --------------------------
 ROM7F dkongjr_obj4(
-	.clk(~W_CLK_12288M),
+	.clk(W_CLK12N),
 	.addr(OBJ_ROM_A),
 	.data(do_dkongjr_obj4)
 );
 //-------------------- WAV_ROM --------------------------------
 ROMWAV ROMWAV(
-	.clk(~W_CLK_12288M),
+	.clk(W_CLK12N),
 	.addr(WAV_ROM_ADDR),
 	.data(do_dkongjr_wav)
 );
@@ -298,7 +320,7 @@ always @(*) begin
     endcase
 end
 
-always @(posedge W_CLK_12288M or negedge I_RESETn)
+always @(posedge W_CLK12P or negedge I_RESETn)
 begin
   if(! I_RESETn)begin
     R_AD  <= 0;
@@ -310,7 +332,7 @@ begin
     OBJ_ROM3_DO <= 0 ;OBJ_ROM4_DO <= 0;
     WB_ROM_DO <= 0;
 	 WAV_ROM_DO <= 0;
-  end else begin
+  end else if(W_CE12P) begin
     clk_d[0] <= W_H_CNT[1] & W_H_CNT[2] & W_H_CNT[3];
     clk_d[1] <= clk_d[0];
     phase <= (~clk_d[1] & clk_d[0]) ? 0 : phase+1'd1;
@@ -395,7 +417,8 @@ end
 
 ram_1024_8 U_3C4C
 (
-	.I_CLK(~W_CLK_12288M),
+	.I_CLK(W_CLK12N),
+	.I_CLK_EN(W_CE12N),
 	.I_ADDR(W_CPU_A[9:0]),
 	.I_D(W_CPU_DO),
 	.I_CE(~W_RAM1_CSn),
@@ -405,7 +428,8 @@ ram_1024_8 U_3C4C
 
 ram_1024_8 U_3B4B
 (
-	.I_CLK(~W_CLK_12288M),
+	.I_CLK(W_CLK12N),
+	.I_CLK_EN(W_CE12N),
 	.I_ADDR(W_CPU_A[9:0]),
 	.I_D(W_CPU_DO),
 	.I_CE(~W_RAM2_CSn),
@@ -429,14 +453,16 @@ wire W_DMA_CEB;
 ram_1024_8_8 U_3A4A
 (
 	//   A Port
-	.I_CLKA(~W_CLK_12288M),
+	.I_CLKA(W_CLK12N),
+	.I_CLKA_EN(W_CE12N),
 	.I_ADDRA(W_CPU_A[9:0]),
 	.I_DA(W_CPU_DO),
 	.I_CEA(~W_RAM3_CSn),
 	.I_WEA(~W_CPU_WRn),
 	.O_DA(W_RAM3_DO),
 	//   B Port
-	.I_CLKB(W_CLK_12288M),
+	.I_CLKB(W_CLK12P),
+	.I_CLKB_EN(W_CE12P),
 	.I_ADDRB(W_DMA_A), //W_OBJ_AB[9:0]),
 	.I_DB(8'h00),
 	.I_CEB(W_DMA_CE),
@@ -446,7 +472,8 @@ ram_1024_8_8 U_3A4A
 
 dkongjr_dma sprite_dma
 (
-	.I_CLK(W_H_CNT[0]), // 3.072 Mhz
+	.I_CLK(W_CLK6P), // 6.144 MHz
+	.I_CLK_EN(W_CE6P),
 	.I_DMA_TRIG(W_DREQ),
 	.I_DMA_DS(W_DMA_D),
 
@@ -460,14 +487,16 @@ dkongjr_dma sprite_dma
 ram_1024_8_8 U_6PR
 (
 	//   A Port
-	.I_CLKA(~W_CLK_12288M),
+	.I_CLKA(W_CLK12N),
+	.I_CLKA_EN(W_CE12N),
 	.I_ADDRA(W_DMA_AB),
 	.I_DA(W_DMA_DB),
 	.I_CEA(W_DMA_CEB),
 	.I_WEA(1'b1),
 	.O_DA(),
 	//   B Port
-	.I_CLKB(W_CLK_12288M),
+	.I_CLKB(W_CLK12P),
+	.I_CLKB_EN(W_CE12P),
 	.I_ADDRB(W_OBJ_AB[9:0]),
 	.I_DB(8'h00),
 	.I_CEB(1'b1),
@@ -501,10 +530,15 @@ dkongjr_inport inport
 //========   Address Decoder  =====================================================
 wire   W_VRAMBUSYn;
 
-dkongjr_adec adec
+dkongjr_adec #(.CLK_CE(CLK_CE)) adec
 (
-	.I_CLK12M(W_CLK_12288M),
-	.I_CLK(WB_CLK_03072M),
+	.I_CLK12M(W_CLK12P),
+	.I_CLK12M_EN(W_CE12P),
+	.I_CLK(W_CLK3P),
+	.I_CLK_EN(W_CE3P),
+	.I_CLKF(W_CLK3N),
+	.I_CLKF_EN(W_CE3N),
+	.I_CLK24M(I_CLK_24576M),
 	.I_RESET_n(I_RESETn),
 	.I_AB(W_CPU_A),
 	.I_DB(W_CPU_DO[3:0]), 
@@ -553,7 +587,7 @@ wire   [5:0]W_VRAM_DAT = {W_VRAM_COL[3:0],W_VRAM_VID[1:0]};
 
 //========   H & V Counter   =====================================================
 
-dkongjr_hv_count hv
+dkongjr_hv_count #(.CLK_CE(CLK_CE)) hv
 (
 	// input
 	.I_CLK(I_CLK_24576M),
@@ -610,6 +644,10 @@ dkongjr_vram vram
 	// input
 	.CLK_24M(I_CLK_24576M),
 	.CLK_12M(~W_CLK_12288M),
+	.I_CLK12P(W_CLK12P),
+	.I_CE12P(W_CE12P),
+	.I_CLK15P(W_CLK15P),
+	.I_CE15P(W_CE15P),
 	.I_AB(W_CPU_A[9:0]),
 	.I_DB(W_CPU_DO),
 	.I_VRAM_WRn(W_VRAM_WRn),
@@ -689,9 +727,8 @@ wire    [7:0]I8035_PBO;
 wire    I8035_ALE;
 wire    I8035_RDn;
 wire    I8035_PSENn;
-wire    I8035_CLK = T48_CE ? I_CLK_24576M : WB_CLK_06144M;
-// 6.144 MHz rising edge: H_CNT_r[1:0] = 01 before the CLK_24M edge
-wire    I8035_CLK_EN = T48_CE ? (~W_H_CNT[0] & W_CLK_12288M) : 1'b1;
+wire    I8035_CLK = W_CLK6P;
+wire    I8035_CLK_EN = W_CE6P;
 wire    I8035_INTn;
 wire    I8035_T0;
 wire    I8035_T1;
@@ -721,9 +758,10 @@ I8035IP SOUND_CPU
 );
 //-------------------------------------------------
 
-dkongjr_sound Digtal_sound
+dkongjr_sound #(.CLK_CE(CLK_CE)) Digtal_sound
 (
-	.I_CLK1(W_CLK_12288M),
+	.I_CLK1(W_CLK12P),
+	.I_CLK1_EN(W_CE12P),
 	.I_CLK2(I_CLK_24576M),
 	.I_RST(I_RESETn),
 	.I8035_DBI(I8035_DBI),
@@ -942,14 +980,14 @@ reg	[2:0]multsample_cnt;
 reg	[2:0]multsample;
 reg	walk_trig_d;
 
-always @(posedge W_CLK_12288M or negedge I_RESETn)
+always @(posedge W_CLK12P or negedge I_RESETn)
 begin
 	if(! I_RESETn)begin
 
 		multsample_cnt	<= 0;
 		multsample		<= 0;
 
-	end else begin
+	end else if(W_CE12P) begin
 	
 		// Walking/climbing multi-sample selection.
 		walk_trig_d <= ~W_6H_Q[0];
@@ -999,7 +1037,8 @@ wire   [8:0]sound_mix = {1'b0, WAV_ROM_DO} + {1'b0, W_D_S_DAT};
 //wire   [8:0]sound_mix = {1'b0, 7'b0} + {1'b0, W_D_S_DAT};
 //wire   [8:0]sound_mix = {1'b0, W_D_S_DAT};
 reg    [8:0]dac_di;
-always@(posedge W_CLK_12288M)
+always@(posedge W_CLK12P)
+if(W_CE12P)
 begin
    if(sound_mix >= 9'h17F)     // POS Limiter
       dac_di <= 9'h0FF;
@@ -1101,11 +1140,11 @@ dkongjr_wav_dma fall_sound
 );
 
 // Wave ROM address bus sharing.
-always @(posedge W_CLK_12288M or negedge I_RESETn)
+always @(posedge W_CLK12P or negedge I_RESETn)
 begin
 	if(! I_RESETn)
 		WAVROM_ADDR <= 0;
-	else
+	else if(W_CE12P)
 		case(W_H_CNT[3:0])
 			0: WAVROM_ADDR <= WAVROM_A[0];
 			2: WAVROM_ADDR <= WAVROM_A[1];
@@ -1157,7 +1196,8 @@ wire signed [15:0]W_DIG_OUT = W_OPT_NOFLT ? W_DIG_D : W_DIG_F;
 //------ Mixer: samples + digital sound, 16-bit limiter, 8-bit unsigned out ---
 wire signed [18:0]sound_mix = W_SMP + {{3{W_DIG_OUT[15]}}, W_DIG_OUT};
 reg signed [15:0]dac_di;
-always@(posedge W_CLK_12288M)
+always@(posedge W_CLK12P)
+if(W_CE12P)
 begin
    if(sound_mix >= 19'sh07FFF)      // POS Limiter
       dac_di <= 16'sh7FFF;

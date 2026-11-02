@@ -24,7 +24,9 @@
 //    1 VF     2 VF      4 VF      8 VF      16 VF     32 VF     64 VF    128 VF 
 
 
-module dkongjr_hv_count(
+// CLK_CE: 1 = H blank, H sync and V counter on I_CLK with enables at the O_CLK and
+// V_CLK rising edges, 0 = clocked by O_CLK and V_CLK
+module dkongjr_hv_count #(parameter CLK_CE = 0)(
 
 // input
 I_CLK,
@@ -75,9 +77,13 @@ end
 assign H_CNT[9:0] = H_CNT_r[10:1];
 assign O_CLK      = H_CNT_r[0]   ; 
 
+wire   W_CLK12P = CLK_CE ? I_CLK : O_CLK;
+wire   W_CE12P  = CLK_CE ? ~H_CNT_r[0] : 1'b1;
+
 reg    V_CLK = 1'b0;
 reg    H_BLANK = 1'b0;
-always@(posedge O_CLK)
+always@(posedge W_CLK12P)
+if(W_CE12P)
 begin
   case(H_CNT[9:0])
     H_BL_P: H_BLANK <= 1;
@@ -92,22 +98,26 @@ assign H_SYNCn  = ~V_CLK;
 assign H_BLANKn = ~H_BLANK;
 
 
+// V_CLK rising edge: set in the same I_CLK cycle by the H process
+wire   W_VCLKP = CLK_CE ? I_CLK : V_CLK;
+wire   W_VCEP  = CLK_CE ? (W_CE12P & (H_CNT[9:0] == V_CL_P) & ~V_CLK) : 1'b1;
+
 reg    [8:0]V_CNT_r;
-always@(posedge V_CLK or negedge RST_n)
+always@(posedge W_VCLKP or negedge RST_n)
 begin
    if(RST_n == 1'b0)
       V_CNT_r <= 0 ;
-   else
+   else if(W_VCEP)
       V_CNT_r <= (V_CNT_r == 255)? 504 : V_CNT_r+1 ;
 end
 
 reg    V_BLANK;
-always@(posedge V_CLK or negedge RST_n)
+always@(posedge W_VCLKP or negedge RST_n)
 begin
    if(RST_n == 1'b0)begin
       V_BLANK <= 0 ;
    end
-   else begin
+   else if(W_VCEP) begin
       case(V_CNT_r[8:0])
          V_BL_P: V_BLANK <= 1;
          V_BL_W: V_BLANK <= 0;

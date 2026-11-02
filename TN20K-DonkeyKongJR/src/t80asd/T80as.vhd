@@ -1,6 +1,8 @@
 ------------------------------------------------------------------------------
 -- 2004.10.18 WR_n active was changed from T2 to T3.
 --                modification by Katsumi Degawa
+-- 2026.11.02 CLK_F, CEN_p, CEN_n added: clock enables for both CLK_n edges
+--                (Basys 3 port, rising edge processes on CLK_n, falling on CLK_F)
 ------------------------------------------------------------------------------
 -- t80as.vhd : The non-tristate signal edition of t80a.vhd
 --
@@ -87,6 +89,9 @@ entity T80as is
 	port(
 		RESET_n		: in std_logic;
 		CLK_n		: in std_logic;
+		CLK_F		: in std_logic; -- falling edge processes: CLK_F rising (not CLK_n with derived clocks)
+		CEN_p		: in std_logic; -- CLK_n enable ('1' with derived clocks)
+		CEN_n		: in std_logic; -- CLK_F enable ('1' with derived clocks)
 		WAIT_n		: in std_logic;
 		INT_n		: in std_logic;
 		NMI_n		: in std_logic;
@@ -136,7 +141,7 @@ architecture rtl of T80as is
 
 begin
 
-	CEN <= '1';
+	CEN <= CEN_p;
 
 	BUSAK_n <= BUSAK_n_i;
 	MREQ_n_i <= not MREQ or (Req_Inhibit and MReq_Inhibit);
@@ -163,7 +168,9 @@ begin
 		if RESET_n = '0' then
 			Reset_s <= '0';
 		elsif CLK_n'event and CLK_n = '1' then
+		if CEN_p = '1' then
 			Reset_s <= '1';
+		end if;
 		end if;
 	end process;
 
@@ -195,9 +202,10 @@ begin
 			TS => TState,
 			IntCycle_n => IntCycle_n);
 
-	process (CLK_n)
+	process (CLK_F)
 	begin
-		if CLK_n'event and CLK_n = '0' then
+		if CLK_F'event and CLK_F = '1' then
+		if CEN_n = '1' then
 			Wait_s <= WAIT_n;
 			if TState = "011" and BUSAK_n_i = '1' then
 --AS--				DI_Reg <= to_x01(D);
@@ -206,20 +214,23 @@ begin
 --<<AS
 			end if;
 		end if;
+		end if;
 	end process;
 
-	process (Reset_s,CLK_n)
+	process (Reset_s,CLK_F)
 	begin
 		if Reset_s = '0' then
 			WR_n_i <= '1';
 --      2004.10.18 modification  
 --		elsif CLK_n'event and CLK_n = '1' then			
-		elsif CLK_n'event and CLK_n = '0' then
+		elsif CLK_F'event and CLK_F = '1' then
+		if CEN_n = '1' then
 			WR_n_i <= '1';
 --			if TState = "001" then	-- To short for IO writes !!!!!!!!!!!!!!!!!!!
 			if TState = "010" then				
 				WR_n_i <= not Write;
 			end if;
+		end if;
 		end if;
 	end process;
 
@@ -228,34 +239,39 @@ begin
 		if Reset_s = '0' then
 			Req_Inhibit <= '0';
 		elsif CLK_n'event and CLK_n = '1' then
+		if CEN_p = '1' then
 			if MCycle = "001" and TState = "010" then
 				Req_Inhibit <= '1';
 			else
 				Req_Inhibit <= '0';
 			end if;
 		end if;
+		end if;
 	end process;
 
-	process (Reset_s,CLK_n)
+	process (Reset_s,CLK_F)
 	begin
 		if Reset_s = '0' then
 			MReq_Inhibit <= '0';
-		elsif CLK_n'event and CLK_n = '0' then
+		elsif CLK_F'event and CLK_F = '1' then
+		if CEN_n = '1' then
 			if MCycle = "001" and TState = "010" then
 				MReq_Inhibit <= '1';
 			else
 				MReq_Inhibit <= '0';
 			end if;
 		end if;
+		end if;
 	end process;
 
-	process(Reset_s,CLK_n)
+	process(Reset_s,CLK_F)
 	begin
 		if Reset_s = '0' then
 			RD <= '0';
 			IORQ_n_i <= '1';
 			MREQ <= '0';
-		elsif CLK_n'event and CLK_n = '0' then
+		elsif CLK_F'event and CLK_F = '1' then
+		if CEN_n = '1' then
 
 			if MCycle = "001" then
 				if TState = "001" then
@@ -283,6 +299,7 @@ begin
 					MREQ <= '0';
 				end if;
 			end if;
+		end if;
 		end if;
 	end process;
 

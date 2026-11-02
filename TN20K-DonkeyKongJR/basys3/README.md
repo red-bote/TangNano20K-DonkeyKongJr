@@ -63,11 +63,14 @@ From a Vivado 2020.2 build:
 
 | Resource  | Used       | Util.                          |
 |-----------|------------|--------------------------------|
-| LUTs      | 2284       | 10.98%                         |
-| Registers | 1028       | 2.47%                          |
+| LUTs      | 3420       | 16.44%                         |
+| Registers | 1435       | 3.45%                          |
 | Block RAM | 33 tiles   | 66.00%                         |
 | DSPs      | 0          | 0.00%                          |
-| Clock     | 24.576 MHz | WNS +15.392 ns, WHS +0.090 ns  |
+| Clock     | 24.576 MHz | WNS +14.012 ns, WHS +0.068 ns  |
+
+The core runs on the one 24.576 MHz clock. The slower clocks of the original design
+are clock enables (core parameter `CLK_CE`).
 
 ## Core changes for the Basys 3 port
 
@@ -81,6 +84,9 @@ project). The faults below were seen on the Basys 3 and not checked on the Tang 
 - Vivado synthesis error: PROM outputs as `wire` (`dkongjr_main.v`).
 - Tile and sound CPU timing races: clock enables (`dkongjr_vram.v`, `i8035ip.v`, T48
   `clock_ctrl.vhd`, `t48_core.vhd`).
+- Long implementation runs (timing repair between clocks): all remaining logic on
+  clock enables (`dkongjr_main.v`, `dkongjr_adec.v`, `dkongjr_bram.v`, `dkongjr_dma.v`,
+  `dkongjr_hv_count.v`, `dkongjr_sound.v`, `dkongjr_vram.v`, Z80 `T80as.vhd`).
 - Wrong, missing, cut short or never-ending sounds, music without decay: sound options
   (`dkongjr_main.v`, `dkongjr_wav_sound.v`, new `dkongjr_wav_dma.v`, `dkongjr_dac.sv`,
   `dkongjr_iir_filter.v`), see Sound.

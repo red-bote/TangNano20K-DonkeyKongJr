@@ -19,10 +19,17 @@
 //================================================================================
 
 
-module dkongjr_adec(
+// CLK_CE: 1 = NMI and 3D latch on I_CLK24M with edge detects, 0 = clocked by
+// W_VBLK and W_1C_Q[0]
+module dkongjr_adec #(parameter CLK_CE = 0)(
 
 I_CLK12M,
+I_CLK12M_EN,
 I_CLK,
+I_CLK_EN,
+I_CLKF,
+I_CLKF_EN,
+I_CLK24M,
 I_RESET_n,
 I_AB,
 I_DB,
@@ -58,7 +65,12 @@ O_3D_Q
 );
 
 input  I_CLK12M;
+input  I_CLK12M_EN;    //   I_CLK12M enable (1 with the derived clock)
 input  I_CLK;          //   H_CNT[1]    3.072MHz
+input  I_CLK_EN;       //   I_CLK enable (1 with the derived clock)
+input  I_CLKF;         //   rising edge = I_CLK falling edge
+input  I_CLKF_EN;      //   I_CLKF enable (1 with the derived clock)
+input  I_CLK24M;
 input  I_RESET_n;
 input  [15:0]I_AB;
 input  [3:0]I_DB;
@@ -110,23 +122,29 @@ always@(posedge I_CLK or negedge I_VBLK_n)
 begin
    if(I_VBLK_n == 1'b0)
       W_7F1_Qn <= 1'b1;
-   else
+   else if(I_CLK_EN)
       W_7F1_Qn <= I_VRAMBUSY_n | W_2A2_Q[1];
 end
 
-always@(negedge I_CLK)
+always@(posedge I_CLKF)
 begin
-   W_7F2_Q <= W_7F1_Qn;
+   if(I_CLKF_EN)
+      W_7F2_Q <= W_7F1_Qn;
 end
 
 //  CPU NMI
 wire  W_VBLK = ~I_VBLK_n;
 reg   O_NMI_n;
-always@(posedge W_VBLK or negedge W_5H_Q[4])
+// CLK_CE = 1: W_VBLK rising edge detected on I_CLK24M (one cycle later)
+reg   W_VBLK_d;
+always@(posedge I_CLK24M) W_VBLK_d <= W_VBLK;
+wire  W_NMI_CLK = CLK_CE ? I_CLK24M : W_VBLK;
+wire  W_NMI_EN  = CLK_CE ? (W_VBLK & ~W_VBLK_d) : 1'b1;
+always@(posedge W_NMI_CLK or negedge W_5H_Q[4])
 begin
    if(~W_5H_Q[4])
       O_NMI_n <= 1'b1;
-   else
+   else if(W_NMI_EN)
       O_NMI_n <= 1'b0;
 end
 
@@ -245,7 +263,7 @@ begin
    if(I_RESET_n == 1'b0) begin
       W_5H_Q <= 0;
    end 
-   else begin
+   else if(I_CLK12M_EN) begin
       if(W_1C_Q[3] == 1'b0) begin
          case(I_AB[2:0])
             3'h0 : W_5H_Q[0] <= I_DB[0];
@@ -269,7 +287,7 @@ begin
    if(I_RESET_n == 1'b0) begin
       W_6H_Q <= 0;
    end 
-   else begin
+   else if(I_CLK12M_EN) begin
       if(W_1C_Q[2] == 1'b0) begin
          case(I_AB[2:0])
             3'h0 : W_6H_Q[0] <= I_DB[0];
@@ -292,7 +310,7 @@ begin
    if(I_RESET_n == 1'b0) begin
       W_4H_Q <= 0;
    end 
-   else begin
+   else if(I_CLK12M_EN) begin
       if(W_1C_Q[1] == 1'b0) begin
          case(I_AB[0])
             3'h0 : W_4H_Q[0] <= I_DB[0]; // VROM signal
@@ -304,13 +322,18 @@ end
 
 //  Parts 3D
 reg   [4:0]O_3D_Q;
+// CLK_CE = 1: W_1C_Q[0] rising edge detected on I_CLK24M (one cycle later)
+reg   W_1C_Q0_d;
+always@(posedge I_CLK24M) W_1C_Q0_d <= W_1C_Q[0];
+wire  W_3D_CLK = CLK_CE ? I_CLK24M : W_1C_Q[0];
+wire  W_3D_EN  = CLK_CE ? (W_1C_Q[0] & ~W_1C_Q0_d) : 1'b1;
 
-always@(posedge W_1C_Q[0] or negedge I_RESET_n)
+always@(posedge W_3D_CLK or negedge I_RESET_n)
 begin
    if(I_RESET_n == 1'b0) begin
 		O_3D_Q <= 0;
 	end
-   else begin
+   else if(W_3D_EN) begin
       O_3D_Q <= I_DB;      
    end 
 end

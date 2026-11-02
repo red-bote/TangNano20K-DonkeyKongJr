@@ -34,6 +34,10 @@ module dkongjr_vram(
 
 CLK_24M,
 CLK_12M,
+I_CLK12P,
+I_CE12P,
+I_CLK15P,
+I_CE15P,
 I_AB,
 I_DB,
 I_VRAM_WRn,
@@ -62,6 +66,10 @@ O_ESBLKn
 
 input  CLK_24M;
 input  CLK_12M;
+input  I_CLK12P;   // 12 MHz rising edge clock and enable (dkongjr_main CLK_CE)
+input  I_CE12P;
+input  I_CLK15P;   // I_H_CNT[2] rising edge clock and enable (dkongjr_main CLK_CE)
+input  I_CE15P;
 input  [9:0]I_AB;
 input  [7:0]I_DB;
 input  I_VRAM_WRn;
@@ -105,7 +113,8 @@ always@(posedge CLK_24M) if(CLK_12M) CLK_2M <= ~(I_H_CNT[1]&I_H_CNT[2]&I_H_CNT[3
 
 ram_1024_8 U_2PR(
 
-.I_CLK(~CLK_12M),
+.I_CLK(I_CLK12P),
+.I_CLK_EN(I_CE12P),
 .I_ADDR(W_vram_AB),
 .I_D(WI_DB),
 .I_CE(~W_vram_CS),
@@ -215,11 +224,11 @@ assign O_VID[1] = W_4M_Y[3];
 //------  PARTS 2K1 ----------------------------------------------
 reg    W_VRAMBUSY;
 assign O_VRAMBUSYn = ~W_VRAMBUSY;
-always@(posedge I_H_CNT[2] or negedge I_H_CNT[9])
+always@(posedge I_CLK15P or negedge I_H_CNT[9])
 begin
    if(I_H_CNT[9] == 1'b0)
       W_VRAMBUSY <= 1'b1;
-   else
+   else if(I_CE15P)
       W_VRAMBUSY <= I_H_CNT[4]&I_H_CNT[5]&I_H_CNT[6]&I_H_CNT[7];
 end
 

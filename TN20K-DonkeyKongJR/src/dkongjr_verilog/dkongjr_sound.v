@@ -20,9 +20,11 @@
 //            Data on the ROM are initialized at the time of the start.   
 //================================================================================
  
-module dkongjr_sound(
+// CLK_CE: 1 = 4F address latch on I_CLK2 with an ALE edge detect, 0 = clocked by ALE
+module dkongjr_sound #(parameter CLK_CE = 0)(
 
 I_CLK1,
+I_CLK1_EN,
 I_CLK2,
 I_RST,
 I8035_DBI,
@@ -51,6 +53,7 @@ O_SOUND_DAT
 );
 
 input   I_CLK1,I_CLK2;
+input   I_CLK1_EN; // I_CLK1 enable (1 with the derived clock)
 input   I_RST;
 
 input   [7:0]I8035_DBI;
@@ -93,12 +96,17 @@ assign  I8035_PBO[7] = 1'b0;
 wire    [11:0]S_ROM_A;
 reg     [7:0]L_ROM_A;
 
-always@(negedge I8035_ALE) L_ROM_A <= I8035_DBI ;
+// CLK_CE = 1: ALE falling edge detected on I_CLK2 (one cycle later)
+reg     ALE_d;
+always@(posedge I_CLK2) ALE_d <= I8035_ALE;
+wire    W_ALE_CLK = CLK_CE ? I_CLK2 : ~I8035_ALE;
+wire    W_ALE_EN  = CLK_CE ? (ALE_d & ~I8035_ALE) : 1'b1;
+always@(posedge W_ALE_CLK) if(W_ALE_EN) L_ROM_A <= I8035_DBI ;
 assign  S_ROM_A = {I8035_PBI[3:0],L_ROM_A[7:0]};
 
 //----  Parts 4C ------------------------------
 reg     S_D1_CS;
-always@(posedge I_CLK1) S_D1_CS <= ~I8035_RDn;
+always@(posedge I_CLK1) if(I_CLK1_EN) S_D1_CS <= ~I8035_RDn;
 
 wire    [7:0]S_D1 = S_D1_CS ? {3'h0,I_SOUND_DAT[4:0]}: 8'h00 ; 
 
@@ -108,6 +116,8 @@ wire   [7:0] ROM_D = I_CNF_EN ? I_CNF_D : 8'h00 ;
 
 wire    [7:0]S_PROG_DB;
 wire    [7:0]S_PROG_D  = I8035_PSENn ? 8'h00 : S_PROG_DB ;
+// With I_CLK1 = CLK_24M (no enable port) the ROM is read every cycle. Its address
+// changes only at the 6.144 MHz rising edge, so DO samples the same data.
 //---------------------------------------------
 snd_rom SNDROM(
 	.clk(I_CLK1),
@@ -118,7 +128,7 @@ snd_rom SNDROM(
 wire    [7:0]I8035_DO = S_PROG_D | S_D1;
 
 reg     [7:0]DO;
-always@(posedge I_CLK1) DO <= I8035_DO;
+always@(posedge I_CLK1) if(I_CLK1_EN) DO <= I8035_DO;
 assign  I8035_DBO = DO;
 
 //----    DAC  I/F     ------------------------  

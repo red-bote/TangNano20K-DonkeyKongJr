@@ -2,6 +2,7 @@
 module  ram_1024_8_8
 (
 	input  I_CLKA,I_CLKB,
+	input  I_CLKA_EN,I_CLKB_EN, // clock enables (1 with the derived clocks)
 	input  [9:0]I_ADDRA,I_ADDRB,
 	input  [7:0]I_DA,I_DB,
 	input  I_CEA,I_CEB,
@@ -35,12 +36,12 @@ assign O_DB = I_CEB ? W_DOB : 8'h00;
         .doutb(W_DOB), //output [7:0] doutb
         .clka(I_CLKA), //input clka
         .ocea(1'b1), //input ocea
-        .cea(I_CEA), //input cea
+        .cea(I_CEA & I_CLKA_EN), //input cea
         .reseta(1'b0), //input reseta
         .wrea(I_WEA), //input wrea
         .clkb(I_CLKB), //input clkb
         .oceb(1'b1), //input oceb
-        .ceb(I_CEB), //input ceb
+        .ceb(I_CEB & I_CLKB_EN), //input ceb
         .resetb(1'b0), //input resetb
         .wreb(I_WEB), //input wreb
         .ada(I_ADDRA), //input [9:0] ada
@@ -56,6 +57,7 @@ endmodule
 module  ram_1024_8
 (
 	input  I_CLK,
+	input  I_CLK_EN, // clock enable (1 with the derived clock)
 	input  [9:0]I_ADDR,
 	input  [7:0]I_D,
 	input  I_CE,
@@ -82,7 +84,7 @@ assign O_D = I_CE ? W_DO : 8'h00;
         .dout(W_DO), //output [7:0] dout
         .clk(I_CLK), //input clk
         .oce(1'b1), //input oce
-        .ce(I_CE), //input ce
+        .ce(I_CE & I_CLK_EN), //input ce
         .reset(1'b0), //input reset
         .wre(I_WE), //input wre
         .ad(I_ADDR), //input [9:0] ad
