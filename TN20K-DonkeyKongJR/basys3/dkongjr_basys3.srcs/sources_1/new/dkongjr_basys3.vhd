@@ -7,6 +7,7 @@
 ---------------------------------------------------------------------------------
 --
 -- 10/27/2026: initial Basys 3 release by Red~Bote
+-- 11/02/2026: joystick on Pmod JA, PmodAMP2 on Pmod JXADC
 --
 ---------------------------------------------------------------------------------
 -- License:
@@ -19,8 +20,8 @@
 --  Connections:
 --   VGA monitor, 31 kHz (scandoubler). 15 kHz RGB with sw13 up (not tested)
 --   USB keyboard on the USB-HID host connector (MAME default keys)
---   Atari-type joystick on Pmod JXADC, pins 1/2/3/4/7 = right/left/down/up/jump
---   PmodAMP2 with speaker on Pmod JA, pins 1/2/4
+--   Atari-type joystick on Pmod JA, pins 1/2/3/4/7 = right/left/down/up/jump
+--   PmodAMP2 with speaker on Pmod JXADC, pins 1/2/4
 --  Controls       keyboard       stick          button
 --   move          arrows         stick
 --   jump          Left Ctrl      fire
@@ -56,8 +57,8 @@ port(
     vsync       : out std_logic;
     ps2_clk     : in  std_logic;
     ps2_dat     : inout std_logic;
-    JA          : out std_logic_vector(7 downto 0);
-    JXADC       : in  std_logic_vector(4 downto 0);
+    JA          : in  std_logic_vector(4 downto 0);
+    JXADC       : out std_logic_vector(3 downto 0);
     led         : out std_logic_vector(15 downto 0)
 );
 end dkongjr_basys3;
@@ -108,10 +109,10 @@ architecture struct of dkongjr_basys3 is
     signal kbd_joy         : std_logic_vector(8 downto 0);
     signal btn_meta        : std_logic_vector(3 downto 0);
     signal btn_s           : std_logic_vector(3 downto 0);
-    signal jx_meta         : std_logic_vector(4 downto 0);
-    signal jx_s            : std_logic_vector(4 downto 0);
+    signal stick_meta      : std_logic_vector(4 downto 0);
+    signal stick_s         : std_logic_vector(4 downto 0);
     attribute ASYNC_REG    : string;
-    attribute ASYNC_REG of btn_meta, btn_s, jx_meta, jx_s : signal is "TRUE";
+    attribute ASYNC_REG of btn_meta, btn_s, stick_meta, stick_s : signal is "TRUE";
     attribute ASYNC_REG of ps2_clk_meta, ps2_clk_s, ps2_dat_meta, ps2_dat_s : signal is "TRUE";
     --
     constant CLOCK_FREQ    : integer := 27E6;
@@ -255,11 +256,10 @@ begin
         dac_o   => M_AUDIO
     );
 
-    JA(0) <= M_AUDIO;
-    JA(1) <= not sw(14);    -- PmodAMP2 GAIN (JA2), active low: sw14 up = gain
-    JA(2) <= '0';
-    JA(3) <= not sw(15);    -- PmodAMP2 SHUTD (JA4), active low: sw15 up = shut down
-    JA(7 downto 4) <= (others => '0');
+    JXADC(0) <= M_AUDIO;
+    JXADC(1) <= not sw(14); -- PmodAMP2 GAIN (JXADC2), active low: sw14 up = gain
+    JXADC(2) <= '0';
+    JXADC(3) <= not sw(15); -- PmodAMP2 SHUTD (JXADC4), active low: sw15 up = shut down
 
 -----------------------------------------------------------------
     -- get scancode from keyboard
@@ -295,23 +295,23 @@ begin
     );
 
 -----------------------------------------------------------------
-    -- buttons and JXADC joystick (active low, pins 1/2/3/4/7 = R/L/D/U/fire):
+    -- buttons and JA joystick (active low, pins 1/2/3/4/7 = R/L/D/U/fire):
     -- 2-FF synchronizers, ORed with the keyboard
     process(clk_sys)
     begin
         if rising_edge(clk_sys) then
-            btn_meta <= btnU & btnD & btnL & btnR;
-            btn_s    <= btn_meta;
-            jx_meta  <= JXADC;
-            jx_s     <= jx_meta;
+            btn_meta   <= btnU & btnD & btnL & btnR;
+            btn_s      <= btn_meta;
+            stick_meta <= JA;
+            stick_s    <= stick_meta;
         end if;
     end process;
 
-    joy_BBBBFRLDU(0) <= kbd_joy(0) or not jx_s(3); -- up
-    joy_BBBBFRLDU(1) <= kbd_joy(1) or not jx_s(2); -- down
-    joy_BBBBFRLDU(2) <= kbd_joy(2) or not jx_s(1); -- left
-    joy_BBBBFRLDU(3) <= kbd_joy(3) or not jx_s(0); -- right
-    joy_BBBBFRLDU(4) <= kbd_joy(4) or not jx_s(4); -- jump
+    joy_BBBBFRLDU(0) <= kbd_joy(0) or not stick_s(3); -- up
+    joy_BBBBFRLDU(1) <= kbd_joy(1) or not stick_s(2); -- down
+    joy_BBBBFRLDU(2) <= kbd_joy(2) or not stick_s(1); -- left
+    joy_BBBBFRLDU(3) <= kbd_joy(3) or not stick_s(0); -- right
+    joy_BBBBFRLDU(4) <= kbd_joy(4) or not stick_s(4); -- jump
     joy_BBBBFRLDU(5) <= kbd_joy(5) or btn_s(1); -- start 1: btnL
     joy_BBBBFRLDU(6) <= kbd_joy(6) or btn_s(0); -- start 2: btnR
     joy_BBBBFRLDU(7) <= kbd_joy(7) or btn_s(3) or btn_s(2); -- coin: btnU, btnD

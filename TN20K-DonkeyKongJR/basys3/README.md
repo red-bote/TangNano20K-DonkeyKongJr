@@ -10,7 +10,7 @@ Digilent Basys 3 (Artix-7 `xc7a35tcpg236-1`).
 - Digilent Basys 3.
 - VGA monitor (31 kHz), or a 15 kHz TV/CRT (sw13, not tested).
 - USB keyboard on the Basys 3 USB-HID host port.
-- Optional: Atari-style joystick on Pmod JXADC, Digilent PmodAMP2 on Pmod JA.
+- Optional: Atari-style joystick on Pmod JA, Digilent PmodAMP2 on Pmod JXADC.
 
 ## Build
 
@@ -40,7 +40,7 @@ make clean       # remove roms, PROM VHDL and Vivado outputs
 | btnU, btnD      | coin                                          |
 | btnL / btnR     | start 1 player / 2 players                    |
 | btnC            | reset                                         |
-| JXADC 1/2/3/4/7 | joystick right/left/down/up/jump (active low) |
+| JA 1/2/3/4/7    | joystick right/left/down/up/jump (active low) |
 | sw0-sw7         | DIP switches (down = default, see below)      |
 | sw8-sw10        | sound options (down = default, see Sound)     |
 | sw13 down       | 31 kHz VGA                                    |
