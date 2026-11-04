@@ -42,11 +42,11 @@ make clean       # remove roms, PROM VHDL and Vivado outputs
 | btnC            | reset                                         |
 | JA 1/2/3/4/7    | joystick right/left/down/up/jump (active low) |
 | sw0-sw7         | DIP switches (down = default, see below)      |
-| sw8-sw10        | sound options (down = default, see Sound)     |
+| sw10-sw11       | sound options (down = default, see Sound)     |
 | sw13 down       | 31 kHz VGA                                    |
 | sw13 up         | 15 kHz TV, composite sync on HS (not tested)  |
-| sw14 up         | PmodAMP2 gain                                 |
-| sw15 up         | PmodAMP2 shutdown (mute)                      |
+| sw14 up         | scanlines, alternate lines at 50 %, 31 kHz    |
+| sw15 up         | audio off (PmodAMP2 shutdown)                 |
 
 DIP switches (switch up inverts the default bit):
 
@@ -102,16 +102,15 @@ ROM set), at half rate, as used in the gaz68 MiSTer core
 The Basys 3 build restores the sound handling of that core, selectable with switches
 (down = default):
 
-| Switch | Down (default)             | Up                 |
-|--------|----------------------------|--------------------|
-| sw8    | four-channel sample player | one-channel player |
-| sw9    | music/effects filter on    | filter off         |
-| sw10   | music/effects decay on     | decay off          |
+| Switch | Down (default)          | Up         |
+|--------|-------------------------|------------|
+| sw11   | music/effects filter on | filter off |
+| sw10   | music/effects decay on  | decay off  |
 
-- Four-channel player: sounds can overlap (e.g. walking during a jump), full sample
-  ROM address and full sample lengths. The fall sound stops when the fall ends.
-- One-channel player (as in the Tang Nano 20K build, with full address and lengths
-  here): one sound at a time, by priority.
+- Four-channel sample player (always used): sounds can overlap (e.g. walking during a
+  jump), full sample ROM address and full sample lengths. The fall sound stops when the
+  fall ends. The core's one-channel player option (`I_SND_OPT(0)`) is tied off in the
+  Basys 3 top.
 - The Tang Nano 20K build keeps the one-channel player with a 13-bit sample address to
   fit, so jump, land and fall play walk data there. Its fall sound also stops when the
   fall ends.

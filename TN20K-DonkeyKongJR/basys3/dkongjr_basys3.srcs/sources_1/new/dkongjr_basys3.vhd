@@ -28,9 +28,9 @@
 --   coin          5                             btnU, btnD
 --   start1/2      1, 2                          btnL, btnR
 --   reset                                       btnC
---  Switches: sw15 audio off, sw14 gain, sw13 15 kHz RGB, sw0-sw7 DIP
+--  Switches: sw15 audio off, sw14 scanlines, sw13 15 kHz RGB, sw0-sw7 DIP
 --  DIP bits: lives 1:0, bonus 3:2, coinage 6:4, cabinet 7, switch down = default
---  Sound (up): sw8 1-channel samples, sw9 filter off, sw10 decay off
+--  Sound (up): sw11 filter off, sw10 decay off
 --  Clock: 1 MMCM, 24.576 MHz from 100 MHz, single clock domain
 --
 -- DIP values and other details: see basys3/README.md
@@ -72,6 +72,7 @@ architecture struct of dkongjr_basys3 is
     signal clock_12        : std_logic;
     signal clk_sys         : std_logic;
     signal locked          : std_logic;
+    signal mmcm_reset      : std_logic := '0';
     --
     signal video_r         : std_logic_vector(5 downto 0);
     signal video_g         : std_logic_vector(5 downto 0);
@@ -123,6 +124,7 @@ architecture struct of dkongjr_basys3 is
     signal clk12_cnt       : std_logic_vector(1 downto 0);
     signal dip_sw          : std_logic_vector(7 downto 0);
     signal scanlines       : std_logic_vector(1 downto 0);
+    signal snd_opt         : std_logic_vector(2 downto 0);
 
 ---------------------------------------------------------------------------
 begin
@@ -133,6 +135,7 @@ begin
     -- Clock
     clk_wiz_0 : entity work.clk_wiz_0
     port map (
+        reset    => mmcm_reset,
         clk_in1  => clk,
         clk_out1 => clk_sys,
         locked   => locked
@@ -155,7 +158,12 @@ begin
 ---------------------------------------------------------------------------
     -- Vivado rejects literals as actuals of Verilog ports, so they go through signals
     dip_sw    <= "10000000" xor sw(7 downto 0);
-    scanlines <= "00";
+    -- sw14 up: scanlines, alternate lines at 50 % brightness (31 kHz output only)
+    scanlines <= "10" when sw(14) = '1' else "00";
+    -- sound options from sw12 down: sw11 filter off, sw10 decay off (sw12 reserved).
+    -- I_SND_OPT: [0] 1-channel player (always off: multi-channel player), [1] filter off,
+    -- [2] decay off
+    snd_opt   <= sw(10) & sw(11) & '0';
 
 ---------------------------------------------------------------------------
     dkongjr : entity work.dkongjr_main
@@ -186,7 +194,7 @@ begin
         I_S2           => not joy_BBBBFRLDU(6),    -- P2 start
         I_C1           => joy_BBBBFRLDU(7),        -- Coin
         I_DIP_SW       => dip_sw,
-        I_SND_OPT      => sw(10 downto 8),
+        I_SND_OPT      => snd_opt,
         O_VGA_R        => M_VIDEO_R,
         O_VGA_G        => M_VIDEO_G,
         O_VGA_B        => M_VIDEO_B,
@@ -257,9 +265,9 @@ begin
     );
 
     JXADC(0) <= M_AUDIO;
-    JXADC(1) <= not sw(14); -- PmodAMP2 GAIN (JXADC2), active low: sw14 up = gain
+    JXADC(1) <= '1';        -- PmodAMP2 GAIN (JXADC2), active low: fixed low gain
     JXADC(2) <= '0';
-    JXADC(3) <= not sw(15); -- PmodAMP2 SHUTD (JXADC4), active low: sw15 up = shut down
+    JXADC(3) <= not sw(15); -- PmodAMP2 SHUTD (JXADC4), active low: sw15 up = audio off
 
 -----------------------------------------------------------------
     -- get scancode from keyboard
