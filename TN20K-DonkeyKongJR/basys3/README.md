@@ -1,13 +1,12 @@
 # Donkey Kong Jr. - Digilent Basys 3
 
-Donkey Kong Jr. (© 1982 Nintendo Co., Ltd.), FPGA core by gaz68 (2019, MiSTer) based on
-the Donkey Kong core by Katsumi Degawa, Tang Nano 20K port by pinballwiz.org
-(<https://github.com/pinballwizz/TangNano20K-DonkeyKongJr>), built here for the
-Digilent Basys 3 (Artix-7 `xc7a35tcpg236-1`).
+Donkey Kong Jr. (1982 Nintendo), FPGA core by gaz68 (2019, MiSTer) based on the Donkey
+Kong core by Katsumi Degawa, based on Tang Nano 20K port by pinballwiz.org
+(<https://github.com/pinballwizz/TangNano20K-DonkeyKongJr>).
 
 ## Hardware
 
-- Digilent Basys 3.
+- Digilent Basys 3 (Artix-7 `xc7a35tcpg236-1`).
 - VGA monitor (31 kHz), or a 15 kHz TV/CRT (sw13, not tested).
 - USB keyboard on the Basys 3 USB-HID host port.
 - Optional: Atari-style joystick on Pmod JA, Digilent PmodAMP2 on Pmod JXADC.
@@ -17,12 +16,12 @@ Digilent Basys 3 (Artix-7 `xc7a35tcpg236-1`).
 Requirements:
 
 - Vivado 2020.2, gcc, make, unzip, openFPGALoader.
-- Romset `dkongjr.zip`, supplied by the user. Roms are not part of this repository.
+- Romset `dkongjr.zip`.
 
 ```
 make roms        # compile make_vhdl_prom, unzip ~/roms/dkongjr.zip, generate PROM VHDL
 make bitstream   # Vivado batch build of basys3/dkongjr_basys3.xpr
-make load        # program the Basys 3 (SRAM), building first if the bitstream is outdated
+make load        # program the xc7 in JTAG mode (jumper JP1 in the JTAG position)
 make clean       # remove roms, PROM VHDL and Vivado outputs
 ```
 
@@ -75,8 +74,7 @@ are clock enables (core parameter `CLK_CE`).
 ## Core changes for the Basys 3 port
 
 Changes to the core files in `src/dkongjr_verilog/` (shared with the Tang Nano 20K
-project). The faults below were seen on the Basys 3 and not checked on the Tang Nano
-20K.
+project):
 
 - Garbled sprites: sprite logic on clock enables (`dkongjr_obj.v`).
 - Colour bleeding, flicker: tile colour logic on clock enables (`dkongjr_vram.v`,
@@ -111,29 +109,18 @@ The Basys 3 build restores the sound handling of that core, selectable with swit
   jump), full sample ROM address and full sample lengths. The fall sound stops when the
   fall ends. The core's one-channel player option (`I_SND_OPT(0)`) is tied off in the
   Basys 3 top.
-- The Tang Nano 20K build keeps the one-channel player with a 13-bit sample address to
-  fit, so jump, land and fall play walk data there. Its fall sound also stops when the
-  fall ends.
 
 ## Third-party additions
 
-PROM tool, unmodified, from <https://github.com/pinballwizz/DE2-Xevious> (commit
-`a5d9eed`):
-
-| File                                        | Function                   | Author  |
-|---------------------------------------------|----------------------------|---------|
-| `tools/tools_prom_src/src/make_vhdl_prom.c` | PROM-to-VHDL converter     | darfpga |
-
-Sound, from the gaz68 MiSTer core (commit `c38f456`), in `src/dkongjr_verilog/`:
-
-| File                   | Function                   | Author              |
-|------------------------|----------------------------|---------------------|
-| `dkongjr_wav_dma.v`    | four-channel sample player | gaz68               |
-| `dkongjr_dac.sv`       | digital sound decay        | gaz68               |
-| `dkongjr_iir_filter.v` | low-pass filter            | Gregory Hogan (MIT) |
-
-Changes: `dkongjr_wav_dma.v` is `dkongjr_wav_sound.v` there, module renamed, volume
-multiply optional. All multiplies are kept out of DSP blocks.
+- `tools/tools_prom_src/src/make_vhdl_prom.c` (darfpga): PROM-to-VHDL converter,
+  unmodified, from <https://github.com/pinballwizz/DE2-Xevious>.
+- Sound, in `src/dkongjr_verilog/`, from the gaz68 MiSTer core
+  <https://github.com/gaz68/Arcade-DonkeyKongJunior_MiSTer>:
+  - `dkongjr_wav_dma.v` (gaz68): four-channel sample player, `dkongjr_wav_sound.v`
+    there, module renamed, volume multiply optional.
+  - `dkongjr_dac.sv` (gaz68): digital sound decay.
+  - `dkongjr_iir_filter.v` (Gregory Hogan, MIT): low-pass filter.
+  - All multiplies are kept out of DSP blocks.
 
 ## License
 
