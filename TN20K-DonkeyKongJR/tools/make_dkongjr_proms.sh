@@ -3,9 +3,9 @@
 # make_dkongjr_proms.bat):
 #   1. compile make_vhdl_prom into tools_prom_src/bin/
 #   2. unzip ROMZIP (comma-separated) or ${ROMDIR:-~/roms}/dkongjr.zip into unzip/
-#   3. write the PROM VHDL and the stamp .done into ../proms/
-# make_vhdl_prom names the entity after the output file, so it writes into unzip/ and
-# the result is moved. ../proms/ROMWAV.vhd is upstream and not generated here.
+#   3. write the PROM VHDL into ../proms/
+#   4. create ../proms/.done, a marker file the Makefile checks before a bitstream build
+# ../proms/ROMWAV.vhd is upstream and not generated here.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -55,6 +55,6 @@ prom v-2n.bpr col_rom.vhd
 
 prom c_3h.bin snd_rom.vhd
 
-touch "$PROM_DIR/.done"   # stamp for the Makefile bitstream prerequisite
+touch "$PROM_DIR/.done"
 echo "PROM VHDL in $PROM_DIR:"
 ls -1 "$PROM_DIR"
